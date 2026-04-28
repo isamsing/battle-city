@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-mod core;
-mod scenes;
+use battle_city::core::GameCorePlugin;
+use battle_city::scenes::ScenesPlugin;
 
 fn main() {
     App::new()
@@ -14,7 +14,7 @@ fn main() {
             }),
             ..default()
         }).set(ImagePlugin::default_nearest()))
-        .add_plugins(crate::core::GameCorePlugin)
-        .add_plugins(scenes::ScenesPlugin)
+        .add_plugins(GameCorePlugin)
+        .add_plugins(ScenesPlugin)
         .run();
 }
