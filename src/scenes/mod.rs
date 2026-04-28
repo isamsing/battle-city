@@ -1,4 +1,5 @@
 mod start_menu;
+mod lobby;
 mod level;
 
 use bevy::prelude::*;
@@ -9,6 +10,7 @@ impl Plugin for ScenesPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             start_menu::StartMenuPlugin,
+            lobby::LobbyPlugin,
             level::LevelPlugin,
         ));
     }

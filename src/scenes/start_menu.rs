@@ -203,6 +203,7 @@ fn handle_mode_select_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut selected: ResMut<SelectedOption>,
     mut game_state: ResMut<NextState<GameState>>,
+    mut menu_state: ResMut<NextState<MenuScreen>>,
 ) {
     if keyboard.just_pressed(KeyCode::ArrowUp) {
         selected.0 = 0;
@@ -213,7 +214,7 @@ fn handle_mode_select_input(
     if keyboard.just_pressed(KeyCode::Enter) {
         match selected.0 {
             0 => game_state.set(GameState::InGame),
-            1 => game_state.set(GameState::InGame), // TODO: multiplayer lobby
+            1 => menu_state.set(MenuScreen::Lobby),
             _ => {}
         }
     }

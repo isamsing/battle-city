@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use battle_city::core::GameCorePlugin;
+use battle_city::net::NetPlugin;
 use battle_city::scenes::ScenesPlugin;
 
 fn main() {
@@ -15,6 +16,7 @@ fn main() {
             ..default()
         }).set(ImagePlugin::default_nearest()))
         .add_plugins(GameCorePlugin)
+        .add_plugins(NetPlugin)
         .add_plugins(ScenesPlugin)
         .run();
 }
