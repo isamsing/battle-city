@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 mod core;
+mod scenes;
 
 fn main() {
     App::new()
@@ -14,5 +15,6 @@ fn main() {
             ..default()
         }).set(ImagePlugin::default_nearest()))
         .add_plugins(crate::core::GameCorePlugin)
+        .add_plugins(scenes::ScenesPlugin)
         .run();
 }

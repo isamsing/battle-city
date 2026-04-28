@@ -8,6 +8,8 @@ pub struct GameCorePlugin;
 
 impl Plugin for GameCorePlugin {
     fn build(&self, app: &mut App) {
-        app.init_state::<states::GameState>();
+        app.init_state::<states::GameState>()
+            .add_sub_state::<states::MenuScreen>()
+            .add_sub_state::<states::InGamePhase>();
     }
 }
