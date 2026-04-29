@@ -14,8 +14,8 @@ pub use player::NetworkPlayer;
 use bullet::components::*;
 use map::tile_position;
 use player::LocalPlayer;
+use player::systems::*;
 use tank::components::*;
-use tank::systems::*;
 use bullet::systems::*;
 
 pub struct LevelPlugin;
