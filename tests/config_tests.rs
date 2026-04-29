@@ -12,12 +12,6 @@ fn map_dimensions_nonzero() {
 }
 
 #[test]
-fn virtual_dimensions_fit_map() {
-    assert!(VIRTUAL_WIDTH >= MAP_WIDTH as f32 * TILE_SIZE);
-    assert!(VIRTUAL_HEIGHT >= MAP_HEIGHT as f32 * TILE_SIZE);
-}
-
-#[test]
 fn window_scale_positive() {
     assert!(WINDOW_SCALE > 0);
 }

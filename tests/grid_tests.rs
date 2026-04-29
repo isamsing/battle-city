@@ -1,3 +1,4 @@
+use battle_city::core::config::TILE_SIZE;
 use battle_city::core::grid::GridPosition;
 use bevy::math::Vec2;
 
@@ -17,19 +18,19 @@ fn to_world_origin() {
 #[test]
 fn to_world_positive() {
     let pos = GridPosition::new(1.0, 2.0);
-    assert_eq!(pos.to_world(), Vec2::new(8.0, 16.0));
+    assert_eq!(pos.to_world(), Vec2::new(TILE_SIZE, 2.0 * TILE_SIZE));
 }
 
 #[test]
 fn to_world_negative() {
     let pos = GridPosition::new(-1.0, -3.0);
-    assert_eq!(pos.to_world(), Vec2::new(-8.0, -24.0));
+    assert_eq!(pos.to_world(), Vec2::new(-TILE_SIZE, -3.0 * TILE_SIZE));
 }
 
 #[test]
 fn to_world_fractional() {
     let pos = GridPosition::new(0.5, 1.5);
-    assert_eq!(pos.to_world(), Vec2::new(4.0, 12.0));
+    assert_eq!(pos.to_world(), Vec2::new(0.5 * TILE_SIZE, 1.5 * TILE_SIZE));
 }
 
 #[test]
@@ -41,14 +42,14 @@ fn from_world_origin() {
 
 #[test]
 fn from_world_exact_tile() {
-    let pos = GridPosition::from_world(Vec2::new(16.0, 24.0));
+    let pos = GridPosition::from_world(Vec2::new(2.0 * TILE_SIZE, 3.0 * TILE_SIZE));
     assert_eq!(pos.x, 2.0);
     assert_eq!(pos.y, 3.0);
 }
 
 #[test]
 fn from_world_fractional() {
-    let pos = GridPosition::from_world(Vec2::new(4.0, 12.0));
+    let pos = GridPosition::from_world(Vec2::new(0.5 * TILE_SIZE, 1.5 * TILE_SIZE));
     assert_eq!(pos.x, 0.5);
     assert_eq!(pos.y, 1.5);
 }
@@ -63,7 +64,7 @@ fn roundtrip_to_world_from_world() {
 
 #[test]
 fn roundtrip_from_world_to_world() {
-    let original = Vec2::new(32.0, 48.0);
+    let original = Vec2::new(2.0 * TILE_SIZE, 4.0 * TILE_SIZE);
     let roundtrip = GridPosition::from_world(original).to_world();
     assert_eq!(roundtrip, original);
 }
