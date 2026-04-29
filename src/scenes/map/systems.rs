@@ -70,7 +70,7 @@ pub fn spawn_tiles(
 
 pub fn load_level(level_number: u32) -> LevelData {
     let ron_str = match level_number {
-        1 => include_str!("../../../../assets/levels/level_1.ron"),
+        1 => include_str!("../../../assets/levels/level_1.ron"),
         _ => panic!("Unknown level: {}", level_number),
     };
     ron::from_str(ron_str).expect("Failed to parse level RON data")

@@ -3,8 +3,8 @@ use bevy_ggrs::prelude::*;
 
 use crate::core::config::TILE_SIZE;
 use crate::net::input::{BattleCityConfig, INPUT_UP, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT};
-use crate::scenes::level::tank::components::*;
-use crate::scenes::level::map::components::Solid;
+use crate::scenes::tank::components::*;
+use crate::scenes::map::components::Solid;
 use super::components::{LocalPlayer, NetworkPlayer};
 
 // --- Collision helpers ---

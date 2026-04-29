@@ -1,8 +1,14 @@
 mod start_menu;
 mod lobby;
 mod level;
+pub mod bullet;
+pub mod map;
+pub mod player;
+pub mod tank;
 
 use bevy::prelude::*;
+
+pub use player::components::NetworkPlayer;
 
 pub struct ScenesPlugin;
 

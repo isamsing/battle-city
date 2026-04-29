@@ -1,8 +1,3 @@
-pub mod bullet;
-pub mod map;
-pub mod player;
-pub mod tank;
-
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
 
@@ -10,13 +5,12 @@ use crate::core::config::TILE_SIZE;
 use crate::core::states::GameState;
 use crate::net::{GameMode, is_networked};
 
-pub use player::NetworkPlayer;
-use bullet::components::*;
-use map::systems::{tile_position, load_level, spawn_tiles};
-use player::LocalPlayer;
-use player::systems::*;
-use tank::components::*;
-use bullet::systems::*;
+use super::bullet::components::*;
+use super::bullet::systems::*;
+use super::map::systems::{tile_position, load_level, spawn_tiles};
+use super::player::components::{LocalPlayer, NetworkPlayer};
+use super::player::systems::*;
+use super::tank::components::*;
 
 pub struct LevelPlugin;
 
