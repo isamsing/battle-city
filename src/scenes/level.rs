@@ -379,7 +379,6 @@ fn build_level_1() -> Vec<Vec<Tile>> {
     }
 
     map[25][12] = Eagle;
-    map[25][13] = Eagle;
     map[23][11] = Brick;
     map[23][12] = Brick;
     map[23][13] = Brick;
