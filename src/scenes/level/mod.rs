@@ -1,8 +1,7 @@
-mod bullet;
-mod map;
-mod player;
-mod systems;
-mod tank;
+pub mod bullet;
+pub mod map;
+pub mod player;
+pub mod tank;
 
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
@@ -12,11 +11,12 @@ use crate::core::states::GameState;
 use crate::net::{GameMode, is_networked};
 
 pub use player::NetworkPlayer;
-use bullet::*;
+use bullet::components::*;
 use map::tile_position;
 use player::LocalPlayer;
-use systems::*;
-use tank::*;
+use tank::components::*;
+use tank::systems::*;
+use bullet::systems::*;
 
 pub struct LevelPlugin;
 

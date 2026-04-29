@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::tank::{Direction, FIXED_DT};
+use crate::scenes::level::tank::components::{Direction, FIXED_DT};
 
 #[derive(Component, Clone)]
 pub struct Bullet {
