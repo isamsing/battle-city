@@ -1,6 +1,4 @@
-mod local;
-mod network;
+pub mod components;
 pub mod systems;
 
-pub use local::LocalPlayer;
-pub use network::NetworkPlayer;
+pub use components::{LocalPlayer, NetworkPlayer};

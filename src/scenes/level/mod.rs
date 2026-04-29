@@ -12,7 +12,7 @@ use crate::net::{GameMode, is_networked};
 
 pub use player::NetworkPlayer;
 use bullet::components::*;
-use map::tile_position;
+use map::systems::{tile_position, load_level, spawn_tiles};
 use player::LocalPlayer;
 use player::systems::*;
 use tank::components::*;
@@ -62,9 +62,9 @@ fn setup_level(
 ) {
     commands.spawn(Camera2d);
 
-    let level_data = map::load_level(1);
+    let level_data = load_level(1);
     let grid = level_data.to_tile_grid();
-    map::spawn_tiles(&mut commands, &asset_server, &grid);
+    spawn_tiles(&mut commands, &asset_server, &grid);
 
     match *game_mode {
         GameMode::Local => {

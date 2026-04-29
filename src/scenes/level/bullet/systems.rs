@@ -4,8 +4,8 @@ use bevy_ggrs::prelude::*;
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::input::{BattleCityConfig, INPUT_FIRE};
 use crate::scenes::level::tank::components::*;
-use crate::scenes::level::player::{LocalPlayer, NetworkPlayer};
-use crate::scenes::level::map::{Solid, BrickTile};
+use crate::scenes::level::player::components::{LocalPlayer, NetworkPlayer};
+use crate::scenes::level::map::components::{Solid, BrickTile};
 use super::components::*;
 
 // --- Helpers ---
