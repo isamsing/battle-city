@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::core::states::MenuScreen;
-use crate::net::session::{generate_room_code, RoomCode};
+use crate::net::session::{generate_room_code, start_matchbox_socket};
 use crate::net::GameMode;
 
 pub struct LobbyPlugin;
@@ -56,7 +56,13 @@ fn setup_lobby(mut commands: Commands) {
             ..default()
         },
         TextColor(Color::WHITE),
-        Transform::from_translation(Vec3::new(-100.0, 40.0, 0.0)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(30.0),
+            width: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
         LobbyEntity,
     ));
 
@@ -68,13 +74,20 @@ fn setup_lobby(mut commands: Commands) {
             ..default()
         },
         TextColor(Color::srgb(0.5, 1.0, 0.5)),
-        Transform::from_translation(Vec3::new(-100.0, -60.0, 0.0)),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(55.0),
+            width: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
         StatusText,
         LobbyEntity,
     ));
 }
 
 fn handle_lobby_input(
+    mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut lobby: ResMut<LobbyState>,
     mut game_mode: ResMut<GameMode>,
@@ -94,6 +107,8 @@ fn handle_lobby_input(
                 lobby.room_code = code.clone();
                 lobby.phase = LobbyPhase::WaitingAsHost;
                 *game_mode = GameMode::OnlineHost(code);
+                start_matchbox_socket(commands, game_mode.into());
+                return;
             }
             if keyboard.just_pressed(KeyCode::KeyJ) {
                 lobby.phase = LobbyPhase::EnteringCode;
@@ -130,6 +145,8 @@ fn handle_lobby_input(
                 lobby.room_code = code.clone();
                 lobby.phase = LobbyPhase::Connecting;
                 *game_mode = GameMode::OnlineJoin(code);
+                start_matchbox_socket(commands, game_mode.into());
+                return;
             }
         }
         LobbyPhase::WaitingAsHost | LobbyPhase::Connecting => {

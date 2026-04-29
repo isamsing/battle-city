@@ -163,7 +163,7 @@ fn setup_mode_select(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // "1 PLAYER" option
     commands.spawn((
-        Text::new("1 PLAYER"),
+        Text::new("SINGLEPLAYER"),
         TextFont {
             font_size: 32.0,
             ..default()
@@ -175,7 +175,7 @@ fn setup_mode_select(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     // "2 PLAYERS" option
     commands.spawn((
-        Text::new("2 PLAYERS"),
+        Text::new("MULTIPLAYER"),
         TextFont {
             font_size: 32.0,
             ..default()

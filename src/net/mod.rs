@@ -17,10 +17,6 @@ impl Plugin for NetPlugin {
             .insert_resource(RollbackFrameRate(60))
             .add_systems(ReadInputs, input::read_local_inputs)
             .add_systems(
-                OnEnter(MenuScreen::Lobby),
-                session::start_matchbox_socket.run_if(is_networked),
-            )
-            .add_systems(
                 Update,
                 session::wait_for_peers
                     .run_if(in_state(MenuScreen::Lobby))
