@@ -13,6 +13,7 @@ pub struct NetPlugin;
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GameMode>()
+            .init_resource::<session::ServerUrl>()
             .add_plugins(GgrsPlugin::<BattleCityConfig>::default())
             .insert_resource(RollbackFrameRate(60))
             .add_systems(ReadInputs, input::read_local_inputs)

@@ -8,7 +8,14 @@ use super::input::BattleCityConfig;
 use super::socket_bridge::MatchboxGgrsSocket;
 use super::GameMode;
 
-pub const MATCHBOX_URL: &str = "ws://localhost:3536";
+#[derive(Resource, Clone)]
+pub struct ServerUrl(pub String);
+
+impl Default for ServerUrl {
+    fn default() -> Self {
+        Self("ws://localhost:3536".to_string())
+    }
+}
 
 #[derive(Resource)]
 pub struct MatchboxRes {
@@ -33,14 +40,14 @@ pub fn generate_room_code() -> String {
         .collect()
 }
 
-pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>) {
+pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>, server_url: Res<ServerUrl>) {
     let room_code = match &*mode {
         GameMode::OnlineHost(code) => code.clone(),
         GameMode::OnlineJoin(code) => code.clone(),
         GameMode::Local => return,
     };
 
-    let room_url = format!("{MATCHBOX_URL}/battle_city_{room_code}?next=2");
+    let room_url = format!("{}/battle_city_{room_code}?next=2", server_url.0);
     let (socket, loop_fut) = WebRtcSocket::new_unreliable(room_url);
 
     let task_pool = IoTaskPool::get();

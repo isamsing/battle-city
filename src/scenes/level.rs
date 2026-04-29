@@ -40,6 +40,9 @@ impl Plugin for LevelPlugin {
 #[derive(Component)]
 struct Solid;
 
+#[derive(Component)]
+struct Tank;
+
 /// Local-only player with keybinds (used in single-player / local 2P)
 #[derive(Component)]
 struct LocalPlayer {
@@ -245,6 +248,7 @@ fn spawn_local_player(
             right,
             sprite_path,
         },
+        Tank,
     ));
 }
 
@@ -273,6 +277,7 @@ fn spawn_network_player(
             handle,
             sprite_path,
         },
+        Tank,
     ));
 }
 
@@ -361,19 +366,26 @@ fn collides_with_solids(pos: Vec3, solids: &[Vec3]) -> bool {
 fn local_player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut player_query: Query<(&mut Transform, &mut TankAnimation, &LocalPlayer)>,
-    solid_query: Query<&Transform, (With<Solid>, Without<LocalPlayer>)>,
+    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &LocalPlayer), With<Tank>>,
+    solid_query: Query<&Transform, (With<Solid>, Without<Tank>)>,
 ) {
     let solid_positions: Vec<Vec3> = solid_query.iter().map(|t| t.translation).collect();
+    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _)| (e, t.translation)).collect();
 
-    for (mut transform, mut anim, player) in &mut player_query {
+    for (entity, mut transform, mut anim, player) in &mut player_query {
+        let mut obstacles = solid_positions.clone();
+        for &(other_entity, other_pos) in &all_tanks {
+            if other_entity != entity {
+                obstacles.push(other_pos);
+            }
+        }
         let mut moving = false;
         let delta = TANK_SPEED * time.delta_secs();
 
         if keyboard.pressed(player.up) {
             let mut new_pos = transform.translation;
             new_pos.y += delta;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Up;
@@ -381,7 +393,7 @@ fn local_player_movement(
         } else if keyboard.pressed(player.down) {
             let mut new_pos = transform.translation;
             new_pos.y -= delta;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Down;
@@ -389,7 +401,7 @@ fn local_player_movement(
         } else if keyboard.pressed(player.left) {
             let mut new_pos = transform.translation;
             new_pos.x -= delta;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Left;
@@ -397,7 +409,7 @@ fn local_player_movement(
         } else if keyboard.pressed(player.right) {
             let mut new_pos = transform.translation;
             new_pos.x += delta;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Right;
@@ -444,12 +456,19 @@ fn local_animate_tank(
 
 fn networked_player_movement(
     inputs: Res<PlayerInputs<BattleCityConfig>>,
-    mut player_query: Query<(&mut Transform, &mut TankAnimation, &NetworkPlayer)>,
-    solid_query: Query<&Transform, (With<Solid>, Without<NetworkPlayer>)>,
+    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &NetworkPlayer), With<Tank>>,
+    solid_query: Query<&Transform, (With<Solid>, Without<Tank>)>,
 ) {
     let solid_positions: Vec<Vec3> = solid_query.iter().map(|t| t.translation).collect();
+    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _)| (e, t.translation)).collect();
 
-    for (mut transform, mut anim, net_player) in &mut player_query {
+    for (entity, mut transform, mut anim, net_player) in &mut player_query {
+        let mut obstacles = solid_positions.clone();
+        for &(other_entity, other_pos) in &all_tanks {
+            if other_entity != entity {
+                obstacles.push(other_pos);
+            }
+        }
         let (input, _status) = inputs[net_player.handle];
         let flags = input.0;
         let mut moving = false;
@@ -457,7 +476,7 @@ fn networked_player_movement(
         if flags & INPUT_UP != 0 {
             let mut new_pos = transform.translation;
             new_pos.y += TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Up;
@@ -465,7 +484,7 @@ fn networked_player_movement(
         } else if flags & INPUT_DOWN != 0 {
             let mut new_pos = transform.translation;
             new_pos.y -= TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Down;
@@ -473,7 +492,7 @@ fn networked_player_movement(
         } else if flags & INPUT_LEFT != 0 {
             let mut new_pos = transform.translation;
             new_pos.x -= TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Left;
@@ -481,7 +500,7 @@ fn networked_player_movement(
         } else if flags & INPUT_RIGHT != 0 {
             let mut new_pos = transform.translation;
             new_pos.x += TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &solid_positions) {
+            if !collides_with_solids(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Right;
