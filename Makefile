@@ -1,4 +1,4 @@
-.PHONY: start download build run
+.PHONY: start download build run wasm deploy
 
 start: download build run
 
@@ -10,3 +10,9 @@ build:
 
 run:
 	cargo run --release
+
+wasm:
+	trunk build --release
+
+deploy:
+	fly deploy

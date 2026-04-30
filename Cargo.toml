@@ -8,7 +8,6 @@ bevy = { version = "0.18.1", features = ["mp3"] }
 bevy_ecs_tilemap = "0.18"
 bevy_ggrs = "0.21"
 matchbox_socket = "0.14"
-bevy_kira_audio = "0.25"
 bevy_egui = "0.39.1"
 bevy_asset_loader = "0.26"
 bevy_common_assets = { version = "0.16", features = ["ron"] }
