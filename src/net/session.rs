@@ -13,7 +13,7 @@ pub struct ServerUrl(pub String);
 
 impl Default for ServerUrl {
     fn default() -> Self {
-        Self("ws://localhost:3536".to_string())
+        Self("wss://battle-city.fly.dev".to_string())
     }
 }
 
