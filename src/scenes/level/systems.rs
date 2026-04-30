@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
-use crate::core::config::TILE_SIZE;
+use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
+
+use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::GameMode;
 
 use crate::scenes::bullet::components::FireCooldown;
@@ -13,7 +15,19 @@ pub fn setup_level(
     asset_server: Res<AssetServer>,
     game_mode: Res<GameMode>,
 ) {
-    commands.spawn(Camera2d);
+    let map_w = MAP_WIDTH as f32 * TILE_SIZE;
+    let map_h = MAP_HEIGHT as f32 * TILE_SIZE;
+
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::AutoMin {
+                min_width: map_w,
+                min_height: map_h,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 
     let level_data = load_level(1);
     let grid = level_data.to_tile_grid();

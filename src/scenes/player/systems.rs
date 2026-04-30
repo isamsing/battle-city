@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
 
-use crate::core::config::TILE_SIZE;
+use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::input::{BattleCityConfig, INPUT_UP, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT};
 use crate::scenes::tank::components::*;
 use crate::scenes::map::components::Solid;
@@ -17,8 +17,22 @@ fn aabb_overlap(a_pos: Vec3, b_pos: Vec3, size: f32) -> bool {
         && (a_pos.y + half) > (b_pos.y - half)
 }
 
+fn out_of_bounds(pos: Vec3) -> bool {
+    let half = TILE_SIZE / 2.0;
+    let half_map_w = MAP_WIDTH as f32 * TILE_SIZE / 2.0;
+    let half_map_h = MAP_HEIGHT as f32 * TILE_SIZE / 2.0;
+    (pos.x - half) < -half_map_w
+        || (pos.x + half) > half_map_w
+        || (pos.y - half) < -half_map_h
+        || (pos.y + half) > half_map_h
+}
+
 fn collides_with_solids(pos: Vec3, solids: &[Vec3]) -> bool {
     solids.iter().any(|&s| aabb_overlap(pos, s, TILE_SIZE))
+}
+
+fn is_blocked(pos: Vec3, solids: &[Vec3]) -> bool {
+    out_of_bounds(pos) || collides_with_solids(pos, solids)
 }
 
 // --- Local movement (single-player, delta-time based) ---
@@ -45,7 +59,7 @@ pub fn local_player_movement(
         if keyboard.pressed(player.up) {
             let mut new_pos = transform.translation;
             new_pos.y += delta;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Up;
@@ -53,7 +67,7 @@ pub fn local_player_movement(
         } else if keyboard.pressed(player.down) {
             let mut new_pos = transform.translation;
             new_pos.y -= delta;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Down;
@@ -61,7 +75,7 @@ pub fn local_player_movement(
         } else if keyboard.pressed(player.left) {
             let mut new_pos = transform.translation;
             new_pos.x -= delta;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Left;
@@ -69,7 +83,7 @@ pub fn local_player_movement(
         } else if keyboard.pressed(player.right) {
             let mut new_pos = transform.translation;
             new_pos.x += delta;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Right;
@@ -136,7 +150,7 @@ pub fn networked_player_movement(
         if flags & INPUT_UP != 0 {
             let mut new_pos = transform.translation;
             new_pos.y += TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Up;
@@ -144,7 +158,7 @@ pub fn networked_player_movement(
         } else if flags & INPUT_DOWN != 0 {
             let mut new_pos = transform.translation;
             new_pos.y -= TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Down;
@@ -152,7 +166,7 @@ pub fn networked_player_movement(
         } else if flags & INPUT_LEFT != 0 {
             let mut new_pos = transform.translation;
             new_pos.x -= TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Left;
@@ -160,7 +174,7 @@ pub fn networked_player_movement(
         } else if flags & INPUT_RIGHT != 0 {
             let mut new_pos = transform.translation;
             new_pos.x += TANK_SPEED_PER_FRAME;
-            if !collides_with_solids(new_pos, &obstacles) {
+            if !is_blocked(new_pos, &obstacles) {
                 transform.translation = new_pos;
             }
             anim.direction = Direction::Right;
