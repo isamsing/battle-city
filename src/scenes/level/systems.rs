@@ -33,6 +33,10 @@ pub fn setup_level(
     let grid = level_data.to_tile_grid();
     spawn_tiles(&mut commands, &asset_server, &grid);
 
+    // Background music
+    commands.spawn(AudioPlayer::new(asset_server.load("levels/background.mp3")))
+        .insert(PlaybackSettings::LOOP);
+
     match *game_mode {
         GameMode::Local => {
             spawn_local_player(
