@@ -13,7 +13,7 @@ primary_region = 'yyz'
 
   [[services.ports]]
     port = 443
-    handlers = ["tls", "http"]
+    handlers = ["tls"]
 
   [[services.ports]]
     port = 80
