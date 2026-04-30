@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use bevy::tasks::IoTaskPool;
 use bevy_ggrs::prelude::*;
 use matchbox_socket::{PeerId, WebRtcSocket};
@@ -50,8 +51,16 @@ pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>, server
     let room_url = format!("{}/battle_city_{room_code}?next=2", server_url.0);
     let (socket, loop_fut) = WebRtcSocket::new_unreliable(room_url);
 
-    let task_pool = IoTaskPool::get();
-    task_pool.spawn(loop_fut).detach();
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_futures::spawn_local(async move {
+        loop_fut.await.expect("matchbox socket error");
+    });
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let task_pool = IoTaskPool::get();
+        task_pool.spawn(loop_fut).detach();
+    }
 
     commands.insert_resource(MatchboxRes { socket });
 }

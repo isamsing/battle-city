@@ -21,6 +21,7 @@ ron = "0.9"
 [target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 instant = { version = "0.1", features = ["wasm-bindgen"] }
+wasm-bindgen-futures = "0.4"
 
 [profile.dev]
 opt-level = 1
