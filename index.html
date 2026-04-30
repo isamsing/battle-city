@@ -22,31 +22,5 @@
 </head>
 <body>
 <canvas id="bevy-canvas"></canvas>
-<script>
-    // Browsers suspend AudioContext until a user gesture. Intercept the
-    // AudioContext constructor so we can resume all instances on first interaction.
-    const audioContexts = [];
-    const OrigAudioContext = window.AudioContext || window.webkitAudioContext;
-    if (OrigAudioContext) {
-        window.AudioContext = function(...args) {
-            const ctx = new OrigAudioContext(...args);
-            audioContexts.push(ctx);
-            return ctx;
-        };
-        window.AudioContext.prototype = OrigAudioContext.prototype;
-        if (window.webkitAudioContext) {
-            window.webkitAudioContext = window.AudioContext;
-        }
-    }
-
-    function resumeAll() {
-        audioContexts.forEach(ctx => {
-            if (ctx.state === "suspended") ctx.resume();
-        });
-    }
-
-    document.addEventListener("click", resumeAll);
-    document.addEventListener("keydown", resumeAll);
-</script>
 </body>
 </html>
