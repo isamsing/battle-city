@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::asset::AssetMetaCheck;
 
 use battle_city::core::GameCorePlugin;
 use battle_city::net::NetPlugin;
@@ -16,7 +17,11 @@ fn main() {
                 ..default()
             }),
             ..default()
-        }).set(ImagePlugin::default_nearest()))
+        }).set(ImagePlugin::default_nearest())
+          .set(AssetPlugin {
+            meta_check: AssetMetaCheck::Never,
+            ..default()
+        }))
         .add_plugins(GameCorePlugin)
         .add_plugins(NetPlugin)
         .add_plugins(ScenesPlugin)
