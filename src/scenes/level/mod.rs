@@ -30,6 +30,7 @@ impl Plugin for LevelPlugin {
                 GgrsSchedule,
                 (networked_player_movement, networked_fire_bullet,
                  move_bullets_networked, bullet_collision)
+                    .chain()
                     .run_if(is_networked),
             )
             // Networked visual-only animation (runs in normal Update)
