@@ -11,6 +11,8 @@ fn main() {
                 title: "Battle City Reimagined".to_string(),
                 resolution: (768u32, 720u32).into(),
                 resizable: false,
+                canvas: Some("#bevy-canvas".to_string()),
+                fit_canvas_to_parent: true,
                 ..default()
             }),
             ..default()
