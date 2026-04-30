@@ -14,5 +14,5 @@ run:
 wasm:
 	trunk build --release
 
-deploy:
+deploy: wasm
 	fly deploy
