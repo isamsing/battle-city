@@ -77,10 +77,11 @@ fn spawn_local_player(
     right: KeyCode,
     sprite_path: &'static str,
 ) {
+    let spawn_anim = SpawnAnimation::new();
     let pos = tile_position(col, row);
     commands.spawn((
         Sprite {
-            image: asset_server.load(format!("{sprite_path}/up_f0.png")),
+            image: asset_server.load(spawn_anim.sprite_path()),
             custom_size: Some(Vec2::splat(TILE_SIZE)),
             ..default()
         },
@@ -98,6 +99,8 @@ fn spawn_local_player(
             sprite_path,
         },
         Tank,
+        TankState::Spawning,
+        spawn_anim,
         FireCooldown::new(),
     ));
 }
@@ -110,10 +113,11 @@ fn spawn_network_player(
     row: i32,
     sprite_path: &'static str,
 ) {
+    let spawn_anim = SpawnAnimation::new();
     let pos = tile_position(col, row);
     commands.spawn((
         Sprite {
-            image: asset_server.load(format!("{sprite_path}/up_f0.png")),
+            image: asset_server.load(spawn_anim.sprite_path()),
             custom_size: Some(Vec2::splat(TILE_SIZE)),
             ..default()
         },
@@ -128,6 +132,8 @@ fn spawn_network_player(
             sprite_path,
         },
         Tank,
+        TankState::Spawning,
+        spawn_anim,
         FireCooldown::new(),
     ));
 }
