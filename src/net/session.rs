@@ -2,7 +2,7 @@ use bevy::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 use bevy::tasks::IoTaskPool;
 use bevy_ggrs::prelude::*;
-use matchbox_socket::{PeerId, WebRtcSocket};
+use matchbox_socket::{PeerId, RtcIceServerConfig, WebRtcSocket, WebRtcSocketBuilder, ChannelConfig};
 
 use crate::core::states::GameState;
 use super::input::BattleCityConfig;
@@ -44,7 +44,20 @@ pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>, server
     };
 
     let room_url = format!("{}/battle_city_{room_code}?next=2", server_url.0);
-    let (socket, loop_fut) = WebRtcSocket::new_unreliable(room_url);
+    let (socket, loop_fut) = WebRtcSocketBuilder::new(room_url)
+        .ice_server(RtcIceServerConfig {
+            urls: vec![
+                "stun:stun.l.google.com:19302".to_string(),
+                "stun:stun1.l.google.com:19302".to_string(),
+                "turn:openrelay.metered.ca:80".to_string(),
+                "turn:openrelay.metered.ca:443".to_string(),
+                "turn:openrelay.metered.ca:443?transport=tcp".to_string(),
+            ],
+            username: Some("openrelayproject".to_string()),
+            credential: Some("openrelayproject".to_string()),
+        })
+        .add_channel(ChannelConfig::unreliable())
+        .build();
 
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_futures::spawn_local(async move {
