@@ -40,13 +40,16 @@ fn is_blocked(pos: Vec3, solids: &[Vec3]) -> bool {
 pub fn local_player_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &LocalPlayer), With<Tank>>,
+    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &LocalPlayer, &TankState), With<Tank>>,
     solid_query: Query<&Transform, (With<Solid>, Without<Tank>)>,
 ) {
     let solid_positions: Vec<Vec3> = solid_query.iter().map(|t| t.translation).collect();
-    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _)| (e, t.translation)).collect();
+    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _, _)| (e, t.translation)).collect();
 
-    for (entity, mut transform, mut anim, player) in &mut player_query {
+    for (entity, mut transform, mut anim, player, tank_state) in &mut player_query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         let mut obstacles = solid_positions.clone();
         for &(other_entity, other_pos) in &all_tanks {
             if other_entity != entity {
@@ -101,9 +104,12 @@ pub fn local_animate_tank(
     time: Res<Time>,
     keyboard: Res<ButtonInput<KeyCode>>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut TankAnimation, &mut Sprite, &LocalPlayer)>,
+    mut query: Query<(&mut TankAnimation, &mut Sprite, &LocalPlayer, &TankState)>,
 ) {
-    for (mut anim, mut sprite, player) in &mut query {
+    for (mut anim, mut sprite, player, tank_state) in &mut query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         let moving = keyboard.pressed(player.up)
             || keyboard.pressed(player.down)
             || keyboard.pressed(player.left)
@@ -130,13 +136,16 @@ pub fn local_animate_tank(
 
 pub fn networked_player_movement(
     inputs: Res<PlayerInputs<BattleCityConfig>>,
-    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &NetworkPlayer), With<Tank>>,
+    mut player_query: Query<(Entity, &mut Transform, &mut TankAnimation, &NetworkPlayer, &TankState), With<Tank>>,
     solid_query: Query<&Transform, (With<Solid>, Without<Tank>)>,
 ) {
     let solid_positions: Vec<Vec3> = solid_query.iter().map(|t| t.translation).collect();
-    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _)| (e, t.translation)).collect();
+    let all_tanks: Vec<(Entity, Vec3)> = player_query.iter().map(|(e, t, _, _, _)| (e, t.translation)).collect();
 
-    for (entity, mut transform, mut anim, net_player) in &mut player_query {
+    for (entity, mut transform, mut anim, net_player, tank_state) in &mut player_query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         let mut obstacles = solid_positions.clone();
         for &(other_entity, other_pos) in &all_tanks {
             if other_entity != entity {
@@ -197,9 +206,12 @@ pub fn networked_player_movement(
 
 pub fn networked_animate_tank(
     asset_server: Res<AssetServer>,
-    mut query: Query<(&TankAnimation, &mut Sprite, &NetworkPlayer)>,
+    mut query: Query<(&TankAnimation, &mut Sprite, &NetworkPlayer, &TankState)>,
 ) {
-    for (anim, mut sprite, net_player) in &mut query {
+    for (anim, mut sprite, net_player, tank_state) in &mut query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         let path = format!(
             "{}/{}_f{}.png",
             net_player.sprite_path,

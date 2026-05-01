@@ -45,7 +45,7 @@ fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, 
 pub fn bullet_collision(
     mut commands: Commands,
     bullet_query: Query<(Entity, &Transform, &Bullet), Without<Tank>>,
-    tank_query: Query<(Entity, &Transform), (With<Tank>, Without<Bullet>)>,
+    tank_query: Query<(Entity, &Transform, &TankState), (With<Tank>, Without<Bullet>)>,
     solid_query: Query<(Entity, &Transform, Option<&BrickTile>), (With<Solid>, Without<Tank>, Without<Bullet>)>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in &bullet_query {
@@ -63,8 +63,11 @@ pub fn bullet_collision(
         }
 
         if !bullet_hit {
-            for (tank_entity, tank_transform) in &tank_query {
+            for (tank_entity, tank_transform, tank_state) in &tank_query {
                 if tank_entity == bullet.owner {
+                    continue;
+                }
+                if *tank_state != TankState::Active {
                     continue;
                 }
                 if bullet_hits_rect(bpos, tank_transform.translation, TILE_SIZE) {
@@ -88,9 +91,12 @@ pub fn local_fire_bullet(
     asset_server: Res<AssetServer>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(Entity, &Transform, &TankAnimation, &mut FireCooldown), With<LocalPlayer>>,
+    mut query: Query<(Entity, &Transform, &TankAnimation, &mut FireCooldown, &TankState), With<LocalPlayer>>,
 ) {
-    for (entity, transform, anim, mut cooldown) in &mut query {
+    for (entity, transform, anim, mut cooldown, tank_state) in &mut query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         cooldown.timer.tick(time.delta());
         if keyboard.just_pressed(KeyCode::Space) && cooldown.timer.is_finished() {
             spawn_bullet(&mut commands, &asset_server, transform.translation, anim.direction, entity);
@@ -121,9 +127,12 @@ pub fn networked_fire_bullet(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     inputs: Res<PlayerInputs<BattleCityConfig>>,
-    mut query: Query<(Entity, &Transform, &TankAnimation, &NetworkPlayer, &mut FireCooldown), With<Tank>>,
+    mut query: Query<(Entity, &Transform, &TankAnimation, &NetworkPlayer, &mut FireCooldown, &TankState), With<Tank>>,
 ) {
-    for (entity, transform, anim, net_player, mut cooldown) in &mut query {
+    for (entity, transform, anim, net_player, mut cooldown, tank_state) in &mut query {
+        if *tank_state != TankState::Active {
+            continue;
+        }
         cooldown.timer.tick(std::time::Duration::from_secs_f32(FIXED_DT));
         let (input, _status) = inputs[net_player.handle];
         if input.0 & INPUT_FIRE != 0 && cooldown.timer.is_finished() {
