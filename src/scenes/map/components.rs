@@ -9,6 +9,11 @@ pub struct Solid;
 #[derive(Component)]
 pub struct BrickTile;
 
+#[derive(Component)]
+pub struct EagleTile {
+    pub owner: usize,
+}
+
 #[derive(Clone, Copy, PartialEq, Deserialize)]
 pub enum Tile {
     Empty,
@@ -26,7 +31,7 @@ pub struct LevelData {
     pub steel_positions: Vec<(i32, i32)>,
     pub water_positions: Vec<(i32, i32)>,
     pub trees_positions: Vec<(i32, i32)>,
-    pub eagle_position: (i32, i32),
+    pub eagle_positions: Vec<(i32, i32)>,
     pub eagle_bricks: Vec<(i32, i32)>,
     pub player_spawns: Vec<(i32, i32)>,
 }
@@ -59,8 +64,9 @@ impl LevelData {
             map[row as usize][col as usize] = Tile::Trees;
         }
 
-        let (ecol, erow) = self.eagle_position;
-        map[erow as usize][ecol as usize] = Tile::Eagle;
+        for &(ecol, erow) in &self.eagle_positions {
+            map[erow as usize][ecol as usize] = Tile::Eagle;
+        }
 
         for &(col, row) in &self.eagle_bricks {
             map[row as usize][col as usize] = Tile::Brick;

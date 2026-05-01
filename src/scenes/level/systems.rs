@@ -6,6 +6,7 @@ use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::GameMode;
 
 use crate::audio_resume::UserInteractionState;
+use crate::core::states::WinnerInfo;
 use crate::scenes::bullet::components::FireCooldown;
 use crate::scenes::map::systems::{tile_position, load_level, spawn_tiles};
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
@@ -33,9 +34,10 @@ pub fn setup_level(
         }),
     ));
 
-    let level_data = load_level(1);
+    let is_online = matches!(*game_mode, GameMode::OnlineHost(_) | GameMode::OnlineJoin(_));
+    let level_data = load_level(if is_online { 2 } else { 1 });
     let grid = level_data.to_tile_grid();
-    spawn_tiles(&mut commands, &asset_server, &grid);
+    spawn_tiles(&mut commands, &asset_server, &grid, &level_data.eagle_positions);
 
     commands.insert_resource(BackgroundMusicPending);
 
@@ -60,8 +62,10 @@ pub fn setup_level(
                 1
             };
 
-            spawn_network_player(&mut commands, &asset_server, 0, 8, 24, "sprites/tanks/player1/level1");
-            spawn_network_player(&mut commands, &asset_server, 1, 16, 24, "sprites/tanks/player2/level1");
+            let (p1_col, p1_row) = (level_data.player_spawns[0].0, level_data.player_spawns[0].1);
+            let (p2_col, p2_row) = (level_data.player_spawns[1].0, level_data.player_spawns[1].1);
+            spawn_network_player(&mut commands, &asset_server, 0, p1_col, p1_row, "sprites/tanks/player1/level1");
+            spawn_network_player(&mut commands, &asset_server, 1, p2_col, p2_row, "sprites/tanks/player2/level1");
 
             commands.insert_resource(bevy_ggrs::LocalPlayers(vec![local_handle]));
         }
@@ -205,4 +209,23 @@ pub fn networked_spawn_animation(
             sprite.image = asset_server.load(anim.sprite_path());
         }
     }
+}
+
+pub fn show_game_over(mut commands: Commands, winner: Option<Res<WinnerInfo>>) {
+    let player_num = winner.map(|w| w.winner_handle + 1).unwrap_or(1);
+    commands.spawn((
+        Text::new(format!("Player {} Wins!", player_num)),
+        TextFont {
+            font_size: 48.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new_with_justify(Justify::Center),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(40.0),
+            width: Val::Percent(100.0),
+            ..default()
+        },
+    ));
 }

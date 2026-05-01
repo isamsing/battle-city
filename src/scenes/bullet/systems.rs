@@ -5,7 +5,8 @@ use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::input::{BattleCityConfig, INPUT_FIRE};
 use crate::scenes::tank::components::*;
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
-use crate::scenes::map::components::{Solid, BrickTile};
+use crate::core::states::{GameState, WinnerInfo};
+use crate::scenes::map::components::{Solid, BrickTile, EagleTile};
 use super::components::*;
 
 // --- Helpers ---
@@ -44,19 +45,40 @@ fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, 
 
 pub fn bullet_collision(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut next_state: ResMut<NextState<GameState>>,
     bullet_query: Query<(Entity, &Transform, &Bullet), Without<Tank>>,
     tank_query: Query<(Entity, &Transform, &TankState), (With<Tank>, Without<Bullet>)>,
-    solid_query: Query<(Entity, &Transform, Option<&BrickTile>), (With<Solid>, Without<Tank>, Without<Bullet>)>,
+    solid_query: Query<(Entity, &Transform, Option<&BrickTile>, Option<&EagleTile>), (With<Solid>, Without<Tank>, Without<Bullet>)>,
+    owner_query: Query<Option<&NetworkPlayer>>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in &bullet_query {
         let bpos = bullet_transform.translation;
         let mut bullet_hit = false;
 
-        for (solid_entity, solid_transform, brick) in &solid_query {
+        for (solid_entity, solid_transform, brick, eagle) in &solid_query {
             if bullet_hits_rect(bpos, solid_transform.translation, TILE_SIZE) {
                 bullet_hit = true;
                 if brick.is_some() {
                     commands.entity(solid_entity).despawn();
+                } else if eagle.is_some() {
+                    // Eagle destroyed — change sprite and trigger win
+                    commands.entity(solid_entity)
+                        .remove::<Solid>()
+                        .remove::<EagleTile>()
+                        .insert(Sprite {
+                            image: asset_server.load("sprites/tiles/eagle_destroyed.png"),
+                            custom_size: Some(Vec2::splat(TILE_SIZE)),
+                            ..default()
+                        });
+                    // Determine winner: the player who fired the bullet wins
+                    let winner = owner_query.get(bullet.owner)
+                        .ok()
+                        .flatten()
+                        .map(|np| np.handle)
+                        .unwrap_or(0);
+                    commands.insert_resource(WinnerInfo { winner_handle: winner });
+                    next_state.set(GameState::GameOver);
                 }
                 break;
             }

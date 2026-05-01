@@ -10,7 +10,7 @@ use super::bullet::components::{Bullet, FireCooldown};
 use super::bullet::systems::*;
 use super::player::systems::*;
 use super::tank::components::{TankAnimation, TankState, SpawnAnimation};
-use systems::{setup_level, spawn_background_music, local_spawn_animation, networked_spawn_animation};
+use systems::{setup_level, spawn_background_music, show_game_over, local_spawn_animation, networked_spawn_animation};
 
 pub struct LevelPlugin;
 
@@ -45,6 +45,8 @@ impl Plugin for LevelPlugin {
                     .run_if(in_state(GameState::InGame))
                     .run_if(is_networked),
             )
+            // Game over screen
+            .add_systems(OnEnter(GameState::GameOver), show_game_over)
             // Register rollback components
             .rollback_component_with_clone::<Transform>()
             .rollback_component_with_clone::<TankAnimation>()

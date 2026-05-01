@@ -28,3 +28,8 @@ pub enum InGamePhase {
     Playing,
     StageComplete,
 }
+
+#[derive(Resource)]
+pub struct WinnerInfo {
+    pub winner_handle: usize,
+}

@@ -27,6 +27,7 @@ pub fn spawn_tiles(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     level: &[Vec<Tile>],
+    eagle_positions: &[(i32, i32)],
 ) {
     let rows = MAP_HEIGHT as i32;
     let cols = MAP_WIDTH as i32;
@@ -64,6 +65,16 @@ pub fn spawn_tiles(
             if tile == Tile::Brick {
                 entity.insert(BrickTile);
             }
+            if tile == Tile::Eagle {
+                // Assign owner: bottom eagle (higher row) → player 0, top eagle (lower row) → player 1
+                let owner = if eagle_positions.len() > 1 {
+                    let max_row = eagle_positions.iter().map(|p| p.1).max().unwrap_or(0);
+                    if row == max_row { 0 } else { 1 }
+                } else {
+                    0
+                };
+                entity.insert(EagleTile { owner });
+            }
         }
     }
 }
@@ -71,6 +82,7 @@ pub fn spawn_tiles(
 pub fn load_level(level_number: u32) -> LevelData {
     let ron_str = match level_number {
         1 => include_str!("../../../assets/levels/level_1.ron"),
+        2 => include_str!("../../../assets/levels/level_multiplayer.ron"),
         _ => panic!("Unknown level: {}", level_number),
     };
     ron::from_str(ron_str).expect("Failed to parse level RON data")
