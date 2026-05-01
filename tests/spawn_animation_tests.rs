@@ -22,8 +22,8 @@ fn spawn_animation_has_4_frames() {
 }
 
 #[test]
-fn spawn_animation_frame_duration_is_100ms() {
+fn spawn_animation_frame_duration_is_50ms() {
     let anim = SpawnAnimation::new();
     let duration_ms = anim.timer.duration().as_secs_f64() * 1000.0;
-    assert!((duration_ms - 100.0).abs() < 0.01, "expected ~100ms, got {duration_ms}ms");
+    assert!((duration_ms - 50.0).abs() < 0.01, "expected ~50ms, got {duration_ms}ms");
 }

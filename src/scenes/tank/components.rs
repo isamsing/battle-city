@@ -53,7 +53,7 @@ pub struct SpawnAnimation {
 
 impl SpawnAnimation {
     pub const TOTAL_FRAMES: usize = 4;
-    pub const FRAME_DURATION_SECS: f32 = 0.1;
+    pub const FRAME_DURATION_SECS: f32 = 0.05;
 
     pub fn new() -> Self {
         Self {
