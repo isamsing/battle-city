@@ -137,3 +137,49 @@ fn spawn_network_player(
         FireCooldown::new(),
     ));
 }
+
+pub fn local_spawn_animation(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Sprite, &mut SpawnAnimation, &mut TankState)>,
+) {
+    for (entity, mut sprite, mut anim, mut state) in &mut query {
+        if *state != TankState::Spawning {
+            continue;
+        }
+        anim.timer.tick(time.delta());
+        if anim.timer.just_finished() {
+            anim.frame += 1;
+            if anim.frame >= SpawnAnimation::TOTAL_FRAMES {
+                *state = TankState::Active;
+                commands.entity(entity).remove::<SpawnAnimation>();
+                // Sprite will be set by the tank animation system next frame
+                continue;
+            }
+            sprite.image = asset_server.load(anim.sprite_path());
+        }
+    }
+}
+
+pub fn networked_spawn_animation(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut query: Query<(Entity, &mut Sprite, &mut SpawnAnimation, &mut TankState)>,
+) {
+    for (entity, mut sprite, mut anim, mut state) in &mut query {
+        if *state != TankState::Spawning {
+            continue;
+        }
+        anim.timer.tick(std::time::Duration::from_secs_f32(FIXED_DT));
+        if anim.timer.just_finished() {
+            anim.frame += 1;
+            if anim.frame >= SpawnAnimation::TOTAL_FRAMES {
+                *state = TankState::Active;
+                commands.entity(entity).remove::<SpawnAnimation>();
+                continue;
+            }
+            sprite.image = asset_server.load(anim.sprite_path());
+        }
+    }
+}

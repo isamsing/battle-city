@@ -9,8 +9,8 @@ use crate::net::is_networked;
 use super::bullet::components::{Bullet, FireCooldown};
 use super::bullet::systems::*;
 use super::player::systems::*;
-use super::tank::components::TankAnimation;
-use systems::setup_level;
+use super::tank::components::{TankAnimation, TankState, SpawnAnimation};
+use systems::{setup_level, local_spawn_animation, networked_spawn_animation};
 
 pub struct LevelPlugin;
 
@@ -20,15 +20,16 @@ impl Plugin for LevelPlugin {
             // Local-only systems (no networking)
             .add_systems(
                 Update,
-                (local_player_movement, local_animate_tank, local_fire_bullet,
+                (local_spawn_animation, local_player_movement, local_animate_tank, local_fire_bullet,
                  move_bullets_local, bullet_collision)
+                    .chain()
                     .run_if(in_state(GameState::InGame))
                     .run_if(not(is_networked)),
             )
             // Networked deterministic systems (runs in GgrsSchedule)
             .add_systems(
                 GgrsSchedule,
-                (networked_player_movement, networked_fire_bullet,
+                (networked_spawn_animation, networked_player_movement, networked_fire_bullet,
                  move_bullets_networked, bullet_collision)
                     .chain()
                     .run_if(is_networked),
@@ -43,6 +44,8 @@ impl Plugin for LevelPlugin {
             // Register rollback components
             .rollback_component_with_clone::<Transform>()
             .rollback_component_with_clone::<TankAnimation>()
+            .rollback_component_with_clone::<TankState>()
+            .rollback_component_with_clone::<SpawnAnimation>()
             .rollback_component_with_clone::<Bullet>()
             .rollback_component_with_clone::<FireCooldown>();
     }
