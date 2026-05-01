@@ -67,6 +67,12 @@ impl SpawnAnimation {
     }
 }
 
+impl Default for SpawnAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub const TANK_SPEED: f32 = 150.0;
 pub const FIXED_DT: f32 = 1.0 / 60.0;
 pub const TANK_SPEED_PER_FRAME: f32 = TANK_SPEED * FIXED_DT;
