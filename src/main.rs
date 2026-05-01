@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::asset::AssetMetaCheck;
 
+use battle_city::audio_resume::AudioResumePlugin;
 use battle_city::core::GameCorePlugin;
 use battle_city::net::NetPlugin;
 use battle_city::scenes::ScenesPlugin;
@@ -22,6 +23,7 @@ fn main() {
             meta_check: AssetMetaCheck::Never,
             ..default()
         }))
+        .add_plugins(AudioResumePlugin)
         .add_plugins(GameCorePlugin)
         .add_plugins(NetPlugin)
         .add_plugins(ScenesPlugin)

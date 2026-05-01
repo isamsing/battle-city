@@ -22,5 +22,15 @@
 </head>
 <body>
 <canvas id="bevy-canvas"></canvas>
+<script>
+  window.__user_has_interacted = false;
+  function onInteract() {
+    window.__user_has_interacted = true;
+    document.removeEventListener('click', onInteract);
+    document.removeEventListener('keydown', onInteract);
+  }
+  document.addEventListener('click', onInteract);
+  document.addEventListener('keydown', onInteract);
+</script>
 </body>
 </html>

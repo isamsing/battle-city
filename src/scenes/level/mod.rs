@@ -10,13 +10,17 @@ use super::bullet::components::{Bullet, FireCooldown};
 use super::bullet::systems::*;
 use super::player::systems::*;
 use super::tank::components::{TankAnimation, TankState, SpawnAnimation};
-use systems::{setup_level, local_spawn_animation, networked_spawn_animation};
+use systems::{setup_level, spawn_background_music, local_spawn_animation, networked_spawn_animation};
 
 pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::InGame), setup_level)
+            .add_systems(
+                Update,
+                spawn_background_music.run_if(in_state(GameState::InGame)),
+            )
             // Local-only systems (no networking)
             .add_systems(
                 Update,
