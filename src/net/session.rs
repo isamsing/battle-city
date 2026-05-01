@@ -28,16 +28,11 @@ pub struct RoomCode(pub String);
 
 pub fn generate_room_code() -> String {
     use rand::Rng;
+    // Exclude ambiguous characters: 0/O, 1/I/L
+    const CHARS: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZ";
     let mut rng = rand::rng();
     (0..4)
-        .map(|_| {
-            let idx = rng.random_range(0..36u8);
-            if idx < 10 {
-                (b'0' + idx) as char
-            } else {
-                (b'A' + idx - 10) as char
-            }
-        })
+        .map(|_| CHARS[rng.random_range(0..CHARS.len())] as char)
         .collect()
 }
 
