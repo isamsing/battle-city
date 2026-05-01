@@ -48,7 +48,9 @@ pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>, server
 
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_futures::spawn_local(async move {
-        loop_fut.await.expect("matchbox socket error");
+        if let Err(e) = loop_fut.await {
+            web_sys::console::error_1(&format!("matchbox socket error: {e:?}").into());
+        }
     });
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -68,7 +70,9 @@ pub fn wait_for_peers(
 ) {
     let Some(mut socket) = socket else { return };
 
-    socket.socket.update_peers();
+    if socket.socket.try_update_peers().is_err() {
+        return;
+    }
     let peers: Vec<PeerId> = socket.socket.connected_peers().collect();
 
     if peers.is_empty() {
