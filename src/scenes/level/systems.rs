@@ -5,10 +5,14 @@ use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::GameMode;
 
+use crate::audio_resume::UserInteractionState;
 use crate::scenes::bullet::components::FireCooldown;
 use crate::scenes::map::systems::{tile_position, load_level, spawn_tiles};
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
 use crate::scenes::tank::components::*;
+
+#[derive(Resource)]
+pub struct BackgroundMusicPending;
 
 pub fn setup_level(
     mut commands: Commands,
@@ -33,9 +37,7 @@ pub fn setup_level(
     let grid = level_data.to_tile_grid();
     spawn_tiles(&mut commands, &asset_server, &grid);
 
-    // Background music
-    commands.spawn(AudioPlayer::new(asset_server.load("levels/background.mp3")))
-        .insert(PlaybackSettings::LOOP);
+    commands.insert_resource(BackgroundMusicPending);
 
     match *game_mode {
         GameMode::Local => {
@@ -138,6 +140,20 @@ fn spawn_network_player(
     ));
 }
 
+pub fn spawn_background_music(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    interaction: Res<UserInteractionState>,
+    pending: Option<Res<BackgroundMusicPending>>,
+) {
+    if pending.is_none() || !interaction.interacted {
+        return;
+    }
+    commands.spawn(AudioPlayer::new(asset_server.load("levels/background.mp3")))
+        .insert(PlaybackSettings::LOOP);
+    commands.remove_resource::<BackgroundMusicPending>();
+}
+
 pub fn local_spawn_animation(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -152,10 +168,13 @@ pub fn local_spawn_animation(
         if anim.timer.just_finished() {
             anim.frame += 1;
             if anim.frame >= SpawnAnimation::TOTAL_FRAMES {
-                *state = TankState::Active;
-                commands.entity(entity).remove::<SpawnAnimation>();
-                // Sprite will be set by the tank animation system next frame
-                continue;
+                anim.loops_remaining -= 1;
+                if anim.loops_remaining == 0 {
+                    *state = TankState::Active;
+                    commands.entity(entity).remove::<SpawnAnimation>();
+                    continue;
+                }
+                anim.frame = 0;
             }
             sprite.image = asset_server.load(anim.sprite_path());
         }
@@ -175,9 +194,13 @@ pub fn networked_spawn_animation(
         if anim.timer.just_finished() {
             anim.frame += 1;
             if anim.frame >= SpawnAnimation::TOTAL_FRAMES {
-                *state = TankState::Active;
-                commands.entity(entity).remove::<SpawnAnimation>();
-                continue;
+                anim.loops_remaining -= 1;
+                if anim.loops_remaining == 0 {
+                    *state = TankState::Active;
+                    commands.entity(entity).remove::<SpawnAnimation>();
+                    continue;
+                }
+                anim.frame = 0;
             }
             sprite.image = asset_server.load(anim.sprite_path());
         }

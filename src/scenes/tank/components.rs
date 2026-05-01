@@ -49,16 +49,19 @@ pub enum TankState {
 pub struct SpawnAnimation {
     pub timer: Timer,
     pub frame: usize,
+    pub loops_remaining: usize,
 }
 
 impl SpawnAnimation {
     pub const TOTAL_FRAMES: usize = 4;
+    pub const TOTAL_LOOPS: usize = 4;
     pub const FRAME_DURATION_SECS: f32 = 0.05;
 
     pub fn new() -> Self {
         Self {
             timer: Timer::from_seconds(Self::FRAME_DURATION_SECS, TimerMode::Repeating),
             frame: 0,
+            loops_remaining: Self::TOTAL_LOOPS,
         }
     }
 
