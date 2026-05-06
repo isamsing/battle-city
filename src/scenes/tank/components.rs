@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::core::config::TILE_SIZE;
+use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 
 #[derive(Component)]
 pub struct Tank;
@@ -120,3 +120,31 @@ impl Default for ExplosionAnimation {
 pub const TANK_SPEED: f32 = 150.0;
 pub const FIXED_DT: f32 = 1.0 / 60.0;
 pub const TANK_SPEED_PER_FRAME: f32 = TANK_SPEED * FIXED_DT;
+
+// --- Shared collision helpers ---
+
+pub fn aabb_overlap(a_pos: Vec3, b_pos: Vec3, size: f32) -> bool {
+    let half = size / 2.0;
+    (a_pos.x - half) < (b_pos.x + half)
+        && (a_pos.x + half) > (b_pos.x - half)
+        && (a_pos.y - half) < (b_pos.y + half)
+        && (a_pos.y + half) > (b_pos.y - half)
+}
+
+pub fn out_of_bounds(pos: Vec3) -> bool {
+    let half = TILE_SIZE / 2.0;
+    let half_map_w = MAP_WIDTH as f32 * TILE_SIZE / 2.0;
+    let half_map_h = MAP_HEIGHT as f32 * TILE_SIZE / 2.0;
+    (pos.x - half) < -half_map_w
+        || (pos.x + half) > half_map_w
+        || (pos.y - half) < -half_map_h
+        || (pos.y + half) > half_map_h
+}
+
+pub fn collides_with_solids(pos: Vec3, solids: &[Vec3]) -> bool {
+    solids.iter().any(|&s| aabb_overlap(pos, s, TILE_SIZE))
+}
+
+pub fn is_blocked(pos: Vec3, solids: &[Vec3]) -> bool {
+    out_of_bounds(pos) || collides_with_solids(pos, solids)
+}

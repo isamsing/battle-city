@@ -6,6 +6,7 @@ use crate::net::input::{BattleCityConfig, INPUT_FIRE};
 use crate::scenes::level::systems::LevelEntity;
 use crate::scenes::tank::components::*;
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
+use crate::scenes::enemy::components::{EnemyTank, Score};
 use crate::core::states::{GameState, WinnerInfo};
 use crate::scenes::map::components::{Solid, BrickTile, EagleTile};
 use super::components::*;
@@ -27,7 +28,7 @@ fn bullet_hits_rect(bullet_pos: Vec3, target_pos: Vec3, target_size: f32) -> boo
         && (bullet_pos.y + half_b) > (target_pos.y - half_t)
 }
 
-fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, direction: Direction, owner: Entity) {
+pub fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, direction: Direction, owner: Entity, team: BulletTeam, speed: f32) {
     let offset = direction.to_velocity() * TILE_SIZE * 0.6;
     let bullet_pos = Vec3::new(pos.x + offset.x, pos.y + offset.y, 1.0);
     let sprite_path = format!("sprites/bullets/bullet_{}.png", direction.as_str());
@@ -38,7 +39,7 @@ fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, 
             ..default()
         },
         Transform::from_translation(bullet_pos),
-        Bullet { direction, owner },
+        Bullet { direction, owner, team, speed },
         LevelEntity,
     ));
 }
@@ -50,21 +51,23 @@ pub fn bullet_collision(
     asset_server: Res<AssetServer>,
     mut next_state: ResMut<NextState<GameState>>,
     bullet_query: Query<(Entity, &Transform, &Bullet), Without<Tank>>,
-    tank_query: Query<(Entity, &Transform, &TankState), (With<Tank>, Without<Bullet>)>,
+    mut enemy_query: Query<(Entity, &Transform, &TankState, &mut EnemyTank), Without<Bullet>>,
+    player_query: Query<(Entity, &Transform, &TankState), (With<Tank>, Without<EnemyTank>, Without<Bullet>)>,
     solid_query: Query<(Entity, &Transform, Option<&BrickTile>, Option<&EagleTile>), (With<Solid>, Without<Tank>, Without<Bullet>)>,
     owner_query: Query<Option<&NetworkPlayer>>,
+    mut score: ResMut<Score>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in &bullet_query {
         let bpos = bullet_transform.translation;
         let mut bullet_hit = false;
 
+        // Check collision with solids (walls, bricks, eagle)
         for (solid_entity, solid_transform, brick, eagle) in &solid_query {
             if bullet_hits_rect(bpos, solid_transform.translation, TILE_SIZE) {
                 bullet_hit = true;
                 if brick.is_some() {
                     commands.entity(solid_entity).despawn();
                 } else if eagle.is_some() {
-                    // Eagle destroyed — change sprite and trigger win
                     commands.entity(solid_entity)
                         .remove::<Solid>()
                         .remove::<EagleTile>()
@@ -73,7 +76,6 @@ pub fn bullet_collision(
                             custom_size: Some(Vec2::splat(TILE_SIZE)),
                             ..default()
                         });
-                    // Determine winner: the player who fired the bullet wins
                     let winner = owner_query.get(bullet.owner)
                         .ok()
                         .flatten()
@@ -86,26 +88,60 @@ pub fn bullet_collision(
             }
         }
 
+        // Check collision with tanks (team-based)
         if !bullet_hit {
-            for (tank_entity, tank_transform, tank_state) in &tank_query {
-                if tank_entity == bullet.owner {
-                    continue;
+            match bullet.team {
+                BulletTeam::Player => {
+                    // Player bullets hit enemy tanks
+                    for (tank_entity, tank_transform, tank_state, mut enemy) in &mut enemy_query {
+                        if tank_entity == bullet.owner {
+                            continue;
+                        }
+                        if *tank_state != TankState::Active {
+                            continue;
+                        }
+                        if bullet_hits_rect(bpos, tank_transform.translation, TILE_SIZE) {
+                            bullet_hit = true;
+                            enemy.hp = enemy.hp.saturating_sub(1);
+                            if enemy.hp == 0 {
+                                score.points += enemy.enemy_type.score();
+                                let explosion = ExplosionAnimation::new();
+                                commands.entity(tank_entity)
+                                    .insert(TankState::Exploding)
+                                    .insert(explosion.clone())
+                                    .insert(Sprite {
+                                        image: asset_server.load(explosion.sprite_path()),
+                                        custom_size: Some(Vec2::splat(explosion.sprite_size())),
+                                        ..default()
+                                    });
+                            }
+                            break;
+                        }
+                    }
                 }
-                if *tank_state != TankState::Active {
-                    continue;
-                }
-                if bullet_hits_rect(bpos, tank_transform.translation, TILE_SIZE) {
-                    bullet_hit = true;
-                    let explosion = ExplosionAnimation::new();
-                    commands.entity(tank_entity)
-                        .insert(TankState::Exploding)
-                        .insert(explosion.clone())
-                        .insert(Sprite {
-                            image: asset_server.load(explosion.sprite_path()),
-                            custom_size: Some(Vec2::splat(explosion.sprite_size())),
-                            ..default()
-                        });
-                    break;
+                BulletTeam::Enemy => {
+                    // Enemy bullets hit player tanks
+                    for (tank_entity, tank_transform, tank_state) in &player_query {
+                        if tank_entity == bullet.owner {
+                            continue;
+                        }
+                        if *tank_state != TankState::Active {
+                            continue;
+                        }
+                        if bullet_hits_rect(bpos, tank_transform.translation, TILE_SIZE) {
+                            bullet_hit = true;
+                            let explosion = ExplosionAnimation::new();
+                            commands.entity(tank_entity)
+                                .insert(TankState::Exploding)
+                                .insert(explosion.clone())
+                                .insert(Sprite {
+                                    image: asset_server.load(explosion.sprite_path()),
+                                    custom_size: Some(Vec2::splat(explosion.sprite_size())),
+                                    ..default()
+                                });
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -131,7 +167,7 @@ pub fn local_fire_bullet(
         }
         cooldown.timer.tick(time.delta());
         if keyboard.just_pressed(KeyCode::Space) && cooldown.timer.is_finished() {
-            spawn_bullet(&mut commands, &asset_server, transform.translation, anim.direction, entity);
+            spawn_bullet(&mut commands, &asset_server, transform.translation, anim.direction, entity, BulletTeam::Player, BULLET_SPEED);
             cooldown.timer.reset();
         }
     }
@@ -144,7 +180,7 @@ pub fn move_bullets_local(
 ) {
     for (entity, mut transform, bullet) in &mut query {
         let vel = bullet.direction.to_velocity();
-        let delta = BULLET_SPEED * time.delta_secs();
+        let delta = bullet.speed * time.delta_secs();
         transform.translation.x += vel.x * delta;
         transform.translation.y += vel.y * delta;
         if bullet_out_of_bounds(transform.translation) {
@@ -168,7 +204,7 @@ pub fn networked_fire_bullet(
         cooldown.timer.tick(std::time::Duration::from_secs_f32(FIXED_DT));
         let (input, _status) = inputs[net_player.handle];
         if input.0 & INPUT_FIRE != 0 && cooldown.timer.is_finished() {
-            spawn_bullet(&mut commands, &asset_server, transform.translation, anim.direction, entity);
+            spawn_bullet(&mut commands, &asset_server, transform.translation, anim.direction, entity, BulletTeam::Player, BULLET_SPEED);
             cooldown.timer.reset();
         }
     }
@@ -180,8 +216,9 @@ pub fn move_bullets_networked(
 ) {
     for (entity, mut transform, bullet) in &mut query {
         let vel = bullet.direction.to_velocity();
-        transform.translation.x += vel.x * BULLET_SPEED_PER_FRAME;
-        transform.translation.y += vel.y * BULLET_SPEED_PER_FRAME;
+        let speed_per_frame = bullet.speed * FIXED_DT;
+        transform.translation.x += vel.x * speed_per_frame;
+        transform.translation.y += vel.y * speed_per_frame;
         if bullet_out_of_bounds(transform.translation) {
             commands.entity(entity).despawn();
         }

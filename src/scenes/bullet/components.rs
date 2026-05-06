@@ -2,10 +2,18 @@ use bevy::prelude::*;
 
 use crate::scenes::tank::components::{Direction, FIXED_DT};
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum BulletTeam {
+    Player,
+    Enemy,
+}
+
 #[derive(Component, Clone)]
 pub struct Bullet {
     pub direction: Direction,
     pub owner: Entity,
+    pub team: BulletTeam,
+    pub speed: f32,
 }
 
 #[derive(Component, Clone)]

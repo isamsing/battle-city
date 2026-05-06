@@ -2,6 +2,7 @@ mod start_menu;
 mod lobby;
 pub(crate) mod level;
 pub mod bullet;
+pub mod enemy;
 pub mod map;
 pub mod player;
 pub mod tank;

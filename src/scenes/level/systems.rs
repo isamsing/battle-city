@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 
-use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
 use bevy_ggrs::prelude::*;
 
-use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
+use crate::core::config::TILE_SIZE;
 use crate::core::states::GameState;
 use crate::net::GameMode;
 use crate::net::input::BattleCityConfig;
@@ -11,6 +10,7 @@ use crate::net::input::BattleCityConfig;
 use crate::audio_resume::UserInteractionState;
 use crate::core::states::WinnerInfo;
 use crate::scenes::bullet::components::FireCooldown;
+use crate::scenes::enemy::components::EnemySpawnState;
 use crate::scenes::map::systems::{tile_position, load_level, spawn_tiles};
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
 use crate::scenes::tank::components::*;
@@ -21,45 +21,18 @@ pub struct LevelEntity;
 #[derive(Resource)]
 pub struct BackgroundMusicPending;
 
-pub fn setup_level(
+pub fn setup_gameplay(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     game_mode: Res<GameMode>,
 ) {
-    let map_w = MAP_WIDTH as f32 * TILE_SIZE;
-    let map_h = MAP_HEIGHT as f32 * TILE_SIZE;
-
-    commands.spawn((
-        Camera2d,
-        Projection::Orthographic(OrthographicProjection {
-            scaling_mode: ScalingMode::AutoMin {
-                min_width: map_w,
-                min_height: map_h,
-            },
-            ..OrthographicProjection::default_2d()
-        }),
-        LevelEntity,
-    ));
-
-    commands.insert_resource(ClearColor(Color::srgb(0.75, 0.75, 0.75)));
-
-    // Black background covering the playable map area
-    commands.spawn((
-        Sprite {
-            color: Color::BLACK,
-            custom_size: Some(Vec2::new(map_w, map_h)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(0.0, 0.0, -1.0)),
-        LevelEntity,
-    ));
-
     let is_online = matches!(*game_mode, GameMode::OnlineHost(_) | GameMode::OnlineJoin(_));
     let level_data = load_level(if is_online { 2 } else { 1 });
     let grid = level_data.to_tile_grid();
     spawn_tiles(&mut commands, &asset_server, &grid, &level_data.eagle_positions);
 
     commands.insert_resource(BackgroundMusicPending);
+    commands.insert_resource(EnemySpawnState::new());
 
     match *game_mode {
         GameMode::Local => {
