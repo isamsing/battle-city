@@ -5,7 +5,7 @@ pub mod socket_bridge;
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
 
-use crate::core::states::MenuScreen;
+use crate::core::states::{GameState, MenuScreen};
 use input::BattleCityConfig;
 
 pub struct NetPlugin;
@@ -22,7 +22,27 @@ impl Plugin for NetPlugin {
                 session::wait_for_peers
                     .run_if(in_state(MenuScreen::Lobby))
                     .run_if(is_networked),
+            )
+            .add_systems(
+                Update,
+                handle_peer_disconnect
+                    .run_if(in_state(GameState::InGame))
+                    .run_if(is_networked),
             );
+    }
+}
+
+fn handle_peer_disconnect(
+    mut session: ResMut<Session<BattleCityConfig>>,
+    mut game_state: ResMut<NextState<GameState>>,
+) {
+    let Session::P2P(s) = &mut *session else { return };
+    for event in s.events() {
+        if matches!(event, GgrsEvent::Disconnected { .. }) {
+            warn!("Peer disconnected, returning to menu");
+            game_state.set(GameState::Menu);
+            return;
+        }
     }
 }
 

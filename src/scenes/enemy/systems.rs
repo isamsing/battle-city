@@ -113,10 +113,11 @@ pub fn local_enemy_spawn_wave(
 pub fn networked_enemy_spawn_wave(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut spawn_state: ResMut<EnemySpawnState>,
+    spawn_state: Option<ResMut<EnemySpawnState>>,
     enemy_query: Query<&TankState, With<EnemyTank>>,
     all_tanks: Query<&Transform, With<Tank>>,
 ) {
+    let Some(mut spawn_state) = spawn_state else { return };
     if spawn_state.spawn_queue.is_empty() {
         return;
     }

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::core::states::MenuScreen;
-use crate::net::session::{generate_room_code, start_matchbox_socket, ServerUrl};
+use crate::net::session::{generate_room_code, start_matchbox_socket, MatchboxRes, ServerUrl};
 use crate::net::GameMode;
 
 pub struct LobbyPlugin;
@@ -394,4 +394,6 @@ fn cleanup_lobby(mut commands: Commands, query: Query<Entity, With<LobbyEntity>>
         commands.entity(entity).despawn();
     }
     commands.remove_resource::<LobbyState>();
+    // Clean up any active WebRTC socket if leaving lobby before peer connected
+    commands.remove_resource::<MatchboxRes>();
 }

@@ -280,6 +280,7 @@ pub fn cleanup_level(mut commands: Commands, query: Query<Entity, With<LevelEnti
 pub fn cleanup_network_session(mut commands: Commands, mut game_mode: ResMut<GameMode>) {
     commands.remove_resource::<Session<BattleCityConfig>>();
     commands.remove_resource::<bevy_ggrs::LocalPlayers>();
+    commands.remove_resource::<crate::net::session::MatchboxRes>();
     *game_mode = GameMode::Local;
 }
 
