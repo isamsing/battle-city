@@ -7,6 +7,9 @@ use super::systems::LevelEntity;
 #[derive(Component)]
 pub struct StageIntroEntity;
 
+#[derive(Component)]
+pub struct ProgressBarFill;
+
 #[derive(Resource)]
 pub struct LevelAssets {
     pub handles: Vec<UntypedHandle>,
@@ -61,6 +64,35 @@ pub fn start_stage_intro(mut commands: Commands, asset_server: Res<AssetServer>)
             width: Val::Percent(100.0),
             ..default()
         },
+        StageIntroEntity,
+        LevelEntity,
+    ));
+
+    // Progress bar background (dark gray)
+    let bar_width = map_w * 0.5;
+    let bar_height = 8.0;
+    let bar_y = -map_h * 0.08;
+
+    commands.spawn((
+        Sprite {
+            color: Color::srgb(0.2, 0.2, 0.2),
+            custom_size: Some(Vec2::new(bar_width, bar_height)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(0.0, bar_y, 0.5)),
+        StageIntroEntity,
+        LevelEntity,
+    ));
+
+    // Progress bar fill (white, starts at 0 width)
+    commands.spawn((
+        Sprite {
+            color: Color::WHITE,
+            custom_size: Some(Vec2::new(0.0, bar_height - 2.0)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(-(bar_width / 2.0), bar_y, 1.0)),
+        ProgressBarFill,
         StageIntroEntity,
         LevelEntity,
     ));
@@ -156,18 +188,31 @@ pub fn check_assets_ready(
     mut timer: ResMut<StageIntroTimer>,
     assets: Res<LevelAssets>,
     mut next_phase: ResMut<NextState<crate::core::states::InGamePhase>>,
+    mut bar_query: Query<(&mut Sprite, &mut Transform), With<ProgressBarFill>>,
 ) {
     timer.0.tick(time.delta());
+
+    // Calculate loading progress
+    let total = assets.handles.len();
+    let loaded = assets.handles.iter()
+        .filter(|handle| asset_server.is_loaded_with_dependencies(handle.id()))
+        .count();
+    let progress = if total > 0 { loaded as f32 / total as f32 } else { 1.0 };
+
+    // Update progress bar fill
+    let bar_max_width = MAP_WIDTH as f32 * TILE_SIZE * 0.5;
+    let fill_width = bar_max_width * progress;
+    for (mut sprite, mut transform) in &mut bar_query {
+        sprite.custom_size = Some(Vec2::new(fill_width, sprite.custom_size.unwrap_or_default().y));
+        // Anchor bar fill to the left edge of the background bar
+        transform.translation.x = -(bar_max_width / 2.0) + (fill_width / 2.0);
+    }
 
     if !timer.0.is_finished() {
         return;
     }
 
-    let all_loaded = assets.handles.iter().all(|handle| {
-        asset_server.is_loaded_with_dependencies(handle.id())
-    });
-
-    if all_loaded {
+    if loaded == total {
         next_phase.set(crate::core::states::InGamePhase::Playing);
     }
 }
