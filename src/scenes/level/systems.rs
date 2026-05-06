@@ -34,6 +34,18 @@ pub fn setup_level(
         }),
     ));
 
+    commands.insert_resource(ClearColor(Color::srgb(0.75, 0.75, 0.75)));
+
+    // Black background covering the playable map area
+    commands.spawn((
+        Sprite {
+            color: Color::BLACK,
+            custom_size: Some(Vec2::new(map_w, map_h)),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(0.0, 0.0, -1.0)),
+    ));
+
     let is_online = matches!(*game_mode, GameMode::OnlineHost(_) | GameMode::OnlineJoin(_));
     let level_data = load_level(if is_online { 2 } else { 1 });
     let grid = level_data.to_tile_grid();
