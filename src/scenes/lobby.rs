@@ -40,7 +40,153 @@ enum LobbyPhase {
     Connecting,
 }
 
-fn setup_lobby(mut commands: Commands) {
+// --- Brick Letter Bitmaps (5 wide × 7 tall) ---
+const CELL_SIZE: f32 = 5.0;
+const LETTER_WIDTH: usize = 5;
+const LETTER_HEIGHT: usize = 7;
+const LETTER_GAP: usize = 1;
+const TITLE_Y: f32 = 220.0;
+
+fn get_letter_bitmap(ch: char) -> Option<[u8; 7]> {
+    match ch {
+        'M' => Some([
+            0b10001,
+            0b11011,
+            0b10101,
+            0b10001,
+            0b10001,
+            0b10001,
+            0b10001,
+        ]),
+        'U' => Some([
+            0b10001,
+            0b10001,
+            0b10001,
+            0b10001,
+            0b10001,
+            0b10001,
+            0b01110,
+        ]),
+        'L' => Some([
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b11111,
+        ]),
+        'T' => Some([
+            0b11111,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+        ]),
+        'I' => Some([
+            0b11111,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b11111,
+        ]),
+        'P' => Some([
+            0b11110,
+            0b10001,
+            0b10001,
+            0b11110,
+            0b10000,
+            0b10000,
+            0b10000,
+        ]),
+        'A' => Some([
+            0b01110,
+            0b10001,
+            0b10001,
+            0b11111,
+            0b10001,
+            0b10001,
+            0b10001,
+        ]),
+        'Y' => Some([
+            0b10001,
+            0b10001,
+            0b01010,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+        ]),
+        'E' => Some([
+            0b11111,
+            0b10000,
+            0b10000,
+            0b11110,
+            0b10000,
+            0b10000,
+            0b11111,
+        ]),
+        'R' => Some([
+            0b11110,
+            0b10001,
+            0b10001,
+            0b11110,
+            0b10010,
+            0b10001,
+            0b10001,
+        ]),
+        _ => None,
+    }
+}
+
+fn word_width_cells(word: &str) -> usize {
+    let letter_count = word.chars().count();
+    if letter_count == 0 {
+        return 0;
+    }
+    letter_count * LETTER_WIDTH + (letter_count - 1) * LETTER_GAP
+}
+
+fn spawn_brick_word(
+    commands: &mut Commands,
+    texture: &Handle<Image>,
+    word: &str,
+    y_top: f32,
+) {
+    let total_cells = word_width_cells(word);
+    let start_x = -(total_cells as f32 * CELL_SIZE) / 2.0;
+
+    let mut cursor_x = 0usize;
+    for ch in word.chars() {
+        if let Some(bitmap) = get_letter_bitmap(ch) {
+            for row in 0..LETTER_HEIGHT {
+                for col in 0..LETTER_WIDTH {
+                    let bit = (bitmap[row] >> (LETTER_WIDTH - 1 - col)) & 1;
+                    if bit == 1 {
+                        let x = start_x + (cursor_x + col) as f32 * CELL_SIZE;
+                        let y = y_top - row as f32 * CELL_SIZE;
+                        commands.spawn((
+                            Sprite {
+                                image: texture.clone(),
+                                custom_size: Some(Vec2::new(CELL_SIZE, CELL_SIZE)),
+                                ..default()
+                            },
+                            Transform::from_translation(Vec3::new(x, y, 0.0)),
+                            LobbyEntity,
+                        ));
+                    }
+                }
+            }
+            cursor_x += LETTER_WIDTH + LETTER_GAP;
+        }
+    }
+}
+
+fn setup_lobby(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(LobbyState {
         phase: LobbyPhase::Choosing,
         room_code: String::new(),
@@ -49,39 +195,31 @@ fn setup_lobby(mut commands: Commands) {
 
     commands.spawn((Camera2d, LobbyEntity));
 
+    // --- Brick-tile "MULTIPLAYER" title ---
+    let brick_texture = asset_server.load("sprites/tiles/brick_full.png");
+    spawn_brick_word(&mut commands, &brick_texture, "MULTIPLAYER", TITLE_Y);
+
     // Instructions text
     commands.spawn((
-        Text::new("H - HOST GAME\nJ - JOIN GAME\nS - SET SERVER\nESC - BACK"),
+        Text2d::new("H - HOST GAME\nJ - JOIN GAME\nS - SET SERVER\nESC - BACK"),
         TextFont {
             font_size: 28.0,
             ..default()
         },
         TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(30.0),
-            width: Val::Percent(100.0),
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
+        Transform::from_translation(Vec3::new(0.0, 100.0, 0.0)),
         LobbyEntity,
     ));
 
     // Status text (shows room code or connection status)
     commands.spawn((
-        Text::new(""),
+        Text2d::new(""),
         TextFont {
             font_size: 24.0,
             ..default()
         },
         TextColor(Color::srgb(0.5, 1.0, 0.5)),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(55.0),
-            width: Val::Percent(100.0),
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
+        Transform::from_translation(Vec3::new(0.0, -40.0, 0.0)),
         StatusText,
         LobbyEntity,
     ));
@@ -133,7 +271,7 @@ fn handle_lobby_input(
             }
             _ => {
                 *game_mode = GameMode::Local;
-                menu_state.set(MenuScreen::ModeSelect);
+                menu_state.set(MenuScreen::Title);
                 return;
             }
         }
@@ -228,7 +366,7 @@ fn handle_lobby_input(
 fn update_lobby_ui(
     lobby: Res<LobbyState>,
     server_url: Res<ServerUrl>,
-    mut query: Query<&mut Text, With<StatusText>>,
+    mut query: Query<&mut Text2d, With<StatusText>>,
 ) {
     for mut text in &mut query {
         let status = match &lobby.phase {
