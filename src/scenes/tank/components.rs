@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::core::config::TILE_SIZE;
+
 #[derive(Component)]
 pub struct Tank;
 
@@ -43,6 +45,7 @@ pub enum TankState {
     #[default]
     Spawning,
     Active,
+    Exploding,
 }
 
 #[derive(Component, Clone)]
@@ -71,6 +74,44 @@ impl SpawnAnimation {
 }
 
 impl Default for SpawnAnimation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Component, Clone)]
+pub struct ExplosionAnimation {
+    pub timer: Timer,
+    pub frame: usize,
+}
+
+impl ExplosionAnimation {
+    pub const TOTAL_FRAMES: usize = 5;
+    pub const FRAME_DURATION_SECS: f32 = 0.08;
+
+    pub fn new() -> Self {
+        Self {
+            timer: Timer::from_seconds(Self::FRAME_DURATION_SECS, TimerMode::Repeating),
+            frame: 0,
+        }
+    }
+
+    pub fn sprite_path(&self) -> &'static str {
+        match self.frame {
+            0 => "sprites/blast/blast_small_0.png",
+            1 => "sprites/blast/blast_small_1.png",
+            2 => "sprites/blast/blast_small_2.png",
+            3 => "sprites/blast/blast_big_0.png",
+            _ => "sprites/blast/blast_big_1.png",
+        }
+    }
+
+    pub fn sprite_size(&self) -> f32 {
+        if self.frame >= 3 { TILE_SIZE * 2.0 } else { TILE_SIZE }
+    }
+}
+
+impl Default for ExplosionAnimation {
     fn default() -> Self {
         Self::new()
     }

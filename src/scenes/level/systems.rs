@@ -233,6 +233,51 @@ pub fn networked_spawn_animation(
     }
 }
 
+pub fn local_explosion_animation(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut Sprite, &mut ExplosionAnimation, &TankState)>,
+) {
+    for (entity, mut sprite, mut anim, state) in &mut query {
+        if *state != TankState::Exploding {
+            continue;
+        }
+        anim.timer.tick(time.delta());
+        if anim.timer.just_finished() {
+            anim.frame += 1;
+            if anim.frame >= ExplosionAnimation::TOTAL_FRAMES {
+                commands.entity(entity).despawn();
+                continue;
+            }
+            sprite.image = asset_server.load(anim.sprite_path());
+            sprite.custom_size = Some(Vec2::splat(anim.sprite_size()));
+        }
+    }
+}
+
+pub fn networked_explosion_animation(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut query: Query<(Entity, &mut Sprite, &mut ExplosionAnimation, &TankState)>,
+) {
+    for (entity, mut sprite, mut anim, state) in &mut query {
+        if *state != TankState::Exploding {
+            continue;
+        }
+        anim.timer.tick(std::time::Duration::from_secs_f32(FIXED_DT));
+        if anim.timer.just_finished() {
+            anim.frame += 1;
+            if anim.frame >= ExplosionAnimation::TOTAL_FRAMES {
+                commands.entity(entity).despawn();
+                continue;
+            }
+            sprite.image = asset_server.load(anim.sprite_path());
+            sprite.custom_size = Some(Vec2::splat(anim.sprite_size()));
+        }
+    }
+}
+
 pub fn show_game_over(mut commands: Commands, winner: Option<Res<WinnerInfo>>) {
     let player_num = winner.map(|w| w.winner_handle + 1).unwrap_or(1);
     commands.spawn((

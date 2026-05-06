@@ -96,7 +96,15 @@ pub fn bullet_collision(
                 }
                 if bullet_hits_rect(bpos, tank_transform.translation, TILE_SIZE) {
                     bullet_hit = true;
-                    commands.entity(tank_entity).despawn();
+                    let explosion = ExplosionAnimation::new();
+                    commands.entity(tank_entity)
+                        .insert(TankState::Exploding)
+                        .insert(explosion.clone())
+                        .insert(Sprite {
+                            image: asset_server.load(explosion.sprite_path()),
+                            custom_size: Some(Vec2::splat(explosion.sprite_size())),
+                            ..default()
+                        });
                     break;
                 }
             }

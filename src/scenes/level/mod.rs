@@ -9,8 +9,8 @@ use crate::net::is_networked;
 use super::bullet::components::{Bullet, FireCooldown};
 use super::bullet::systems::*;
 use super::player::systems::*;
-use super::tank::components::{TankAnimation, TankState, SpawnAnimation};
-use systems::{setup_level, spawn_background_music, show_game_over, local_spawn_animation, networked_spawn_animation, cleanup_level, cleanup_network_session, handle_escape_to_menu};
+use super::tank::components::{TankAnimation, TankState, SpawnAnimation, ExplosionAnimation};
+use systems::{setup_level, spawn_background_music, show_game_over, local_spawn_animation, networked_spawn_animation, local_explosion_animation, networked_explosion_animation, cleanup_level, cleanup_network_session, handle_escape_to_menu};
 
 fn reset_clear_color(mut commands: Commands) {
     commands.insert_resource(ClearColor(Color::BLACK));
@@ -35,7 +35,7 @@ impl Plugin for LevelPlugin {
             // Local-only systems (no networking)
             .add_systems(
                 Update,
-                (local_spawn_animation, local_player_movement, local_animate_tank, local_fire_bullet,
+                (local_spawn_animation, local_explosion_animation, local_player_movement, local_animate_tank, local_fire_bullet,
                  move_bullets_local, bullet_collision)
                     .chain()
                     .run_if(in_state(GameState::InGame))
@@ -44,7 +44,7 @@ impl Plugin for LevelPlugin {
             // Networked deterministic systems (runs in GgrsSchedule)
             .add_systems(
                 GgrsSchedule,
-                (networked_spawn_animation, networked_player_movement, networked_fire_bullet,
+                (networked_spawn_animation, networked_explosion_animation, networked_player_movement, networked_fire_bullet,
                  move_bullets_networked, bullet_collision)
                     .chain()
                     .run_if(is_networked),
@@ -63,6 +63,7 @@ impl Plugin for LevelPlugin {
             .rollback_component_with_clone::<TankAnimation>()
             .rollback_component_with_clone::<TankState>()
             .rollback_component_with_clone::<SpawnAnimation>()
+            .rollback_component_with_clone::<ExplosionAnimation>()
             .rollback_component_with_clone::<Bullet>()
             .rollback_component_with_clone::<FireCooldown>();
     }
