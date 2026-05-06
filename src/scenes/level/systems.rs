@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 
 use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
+use bevy_ggrs::prelude::*;
 
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::core::states::GameState;
 use crate::net::GameMode;
+use crate::net::input::BattleCityConfig;
 
 use crate::audio_resume::UserInteractionState;
 use crate::core::states::WinnerInfo;
@@ -255,6 +257,12 @@ pub fn cleanup_level(mut commands: Commands, query: Query<Entity, With<LevelEnti
     for entity in &query {
         commands.entity(entity).despawn();
     }
+}
+
+pub fn cleanup_network_session(mut commands: Commands, mut game_mode: ResMut<GameMode>) {
+    commands.remove_resource::<Session<BattleCityConfig>>();
+    commands.remove_resource::<bevy_ggrs::LocalPlayers>();
+    *game_mode = GameMode::Local;
 }
 
 pub fn handle_escape_to_menu(
