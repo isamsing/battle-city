@@ -9,24 +9,24 @@ impl Plugin for StartMenuPlugin {
         app.add_systems(OnEnter(MenuScreen::Title), setup_title)
             .add_systems(
                 Update,
-                (blink_prompt, animate_tank, handle_title_input)
-                    .run_if(in_state(MenuScreen::Title)),
+                (handle_title_input, update_cursor).run_if(in_state(MenuScreen::Title)),
             )
-            .add_systems(OnExit(MenuScreen::Title), cleanup_menu)
-            .add_systems(OnEnter(MenuScreen::ModeSelect), setup_mode_select)
-            .add_systems(
-                Update,
-                (handle_mode_select_input, update_cursor)
-                    .run_if(in_state(MenuScreen::ModeSelect)),
-            )
-            .add_systems(OnExit(MenuScreen::ModeSelect), cleanup_menu);
+            .add_systems(OnExit(MenuScreen::Title), cleanup_menu);
     }
 }
 
-// --- Shared ---
+// --- Components & Resources ---
 
 #[derive(Component)]
 struct MenuEntity;
+
+#[derive(Component)]
+struct CursorTank;
+
+#[derive(Resource)]
+struct SelectedOption(usize);
+
+const OPTION_COUNT: usize = 2;
 
 fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuEntity>>) {
     for entity in &query {
@@ -34,182 +34,233 @@ fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuEntity>>) 
     }
 }
 
-// --- Title Screen ---
+// --- Brick Letter Bitmaps (5 wide × 7 tall) ---
+// Each row is a u8 where bits 4..0 represent columns left-to-right
 
-#[derive(Component)]
-struct BlinkingText {
-    timer: Timer,
-    visible: bool,
+fn get_letter_bitmap(ch: char) -> Option<[u8; 7]> {
+    match ch {
+        'B' => Some([
+            0b11110,
+            0b10001,
+            0b10001,
+            0b11110,
+            0b10001,
+            0b10001,
+            0b11110,
+        ]),
+        'A' => Some([
+            0b01110,
+            0b10001,
+            0b10001,
+            0b11111,
+            0b10001,
+            0b10001,
+            0b10001,
+        ]),
+        'T' => Some([
+            0b11111,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+        ]),
+        'L' => Some([
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b11111,
+        ]),
+        'E' => Some([
+            0b11111,
+            0b10000,
+            0b10000,
+            0b11110,
+            0b10000,
+            0b10000,
+            0b11111,
+        ]),
+        'C' => Some([
+            0b01110,
+            0b10001,
+            0b10000,
+            0b10000,
+            0b10000,
+            0b10001,
+            0b01110,
+        ]),
+        'I' => Some([
+            0b11111,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b11111,
+        ]),
+        'Y' => Some([
+            0b10001,
+            0b10001,
+            0b01010,
+            0b00100,
+            0b00100,
+            0b00100,
+            0b00100,
+        ]),
+        ' ' => None, // space = no bricks
+        _ => None,
+    }
 }
 
-#[derive(Component)]
-struct AnimatedTank {
-    timer: Timer,
-    frame: usize,
-}
+// --- Title Screen Setup ---
+
+const CELL_SIZE: f32 = 6.0;
+const LETTER_WIDTH: usize = 5;
+const LETTER_HEIGHT: usize = 7;
+const LETTER_GAP: usize = 1; // cells between letters
+
+const TITLE_LINE1_Y: f32 = 160.0;  // "BATTLE"
+const TITLE_LINE2_Y: f32 = 100.0;  // "CITY"
+const MENU_Y_START: f32 = -40.0;
+const MENU_Y_SPACING: f32 = 40.0;
+const MENU_TEXT_X: f32 = 0.0;       // menu text centered
+const CURSOR_X: f32 = -120.0;       // tank well to the left of text
 
 fn setup_title(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((Camera2d, MenuEntity));
-
-    // Title text "BATTLE CITY"
-    commands.spawn((
-        Text::new("BATTLE CITY"),
-        TextFont {
-            font_size: 48.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(20.0),
-            left: Val::Percent(50.0),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(-150.0, 0.0, 0.0)),
-        MenuEntity,
-    ));
-
-    // Animated tank sprite
-    let texture = asset_server.load("sprites/tanks/player1/level1/down_f0.png");
-    commands.spawn((
-        Sprite {
-            image: texture,
-            custom_size: Some(Vec2::new(64.0, 64.0)),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(0.0, -20.0, 0.0)),
-        AnimatedTank {
-            timer: Timer::from_seconds(0.3, TimerMode::Repeating),
-            frame: 0,
-        },
-        MenuEntity,
-    ));
-
-    // "PRESS ENTER" blinking text
-    commands.spawn((
-        Text::new("PRESS ENTER"),
-        TextFont {
-            font_size: 24.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Node {
-            position_type: PositionType::Absolute,
-            bottom: Val::Percent(20.0),
-            left: Val::Percent(50.0),
-            ..default()
-        },
-        Transform::from_translation(Vec3::new(-80.0, 0.0, 0.0)),
-        BlinkingText {
-            timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-            visible: true,
-        },
-        MenuEntity,
-    ));
-}
-
-fn blink_prompt(time: Res<Time>, mut query: Query<(&mut BlinkingText, &mut TextColor)>) {
-    for (mut blink, mut color) in &mut query {
-        blink.timer.tick(time.delta());
-        if blink.timer.just_finished() {
-            blink.visible = !blink.visible;
-            color.0 = if blink.visible {
-                Color::WHITE
-            } else {
-                Color::srgba(1.0, 1.0, 1.0, 0.0)
-            };
-        }
-    }
-}
-
-fn animate_tank(
-    time: Res<Time>,
-    asset_server: Res<AssetServer>,
-    mut query: Query<(&mut AnimatedTank, &mut Sprite)>,
-) {
-    for (mut tank, mut sprite) in &mut query {
-        tank.timer.tick(time.delta());
-        if tank.timer.just_finished() {
-            tank.frame = (tank.frame + 1) % 2;
-            let path = format!("sprites/tanks/player1/level1/down_f{}.png", tank.frame);
-            sprite.image = asset_server.load(path);
-        }
-    }
-}
-
-fn handle_title_input(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut next_state: ResMut<NextState<MenuScreen>>,
-) {
-    if keyboard.just_pressed(KeyCode::Enter) {
-        next_state.set(MenuScreen::ModeSelect);
-    }
-}
-
-// --- Mode Select Screen ---
-
-#[derive(Resource)]
-struct SelectedOption(usize);
-
-#[derive(Component)]
-struct CursorTank;
-
-const OPTION_Y: [f32; 2] = [20.0, -40.0];
-
-fn setup_mode_select(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(SelectedOption(0));
-
     commands.spawn((Camera2d, MenuEntity));
 
-    // "1 PLAYER" option
+    let brick_texture = asset_server.load("sprites/tiles/brick_full.png");
+
+    // --- Score / HI line at top ---
     commands.spawn((
-        Text::new("SINGLEPLAYER"),
+        Text2d::new("I-    00  HI- 20000"),
         TextFont {
-            font_size: 32.0,
+            font_size: 20.0,
             ..default()
         },
         TextColor(Color::WHITE),
-        Transform::from_translation(Vec3::new(-60.0, OPTION_Y[0], 0.0)),
+        Transform::from_translation(Vec3::new(0.0, 280.0, 0.0)),
         MenuEntity,
     ));
 
-    // "2 PLAYERS" option
-    commands.spawn((
-        Text::new("MULTIPLAYER"),
-        TextFont {
-            font_size: 32.0,
-            ..default()
-        },
-        TextColor(Color::WHITE),
-        Transform::from_translation(Vec3::new(-60.0, OPTION_Y[1], 0.0)),
-        MenuEntity,
-    ));
+    // --- Brick-tile "BATTLE" (line 1) and "CITY" (line 2) ---
+    spawn_brick_word(&mut commands, &brick_texture, "BATTLE", TITLE_LINE1_Y);
+    spawn_brick_word(&mut commands, &brick_texture, "CITY", TITLE_LINE2_Y);
 
-    // Tank cursor sprite (points right)
-    let texture = asset_server.load("sprites/tanks/player1/level1/right_f0.png");
+    // --- Menu options (text to the right of cursor tank) ---
+    let options = ["SinglePlayer", "MultiPlayer"];
+    for (i, label) in options.iter().enumerate() {
+        let y = MENU_Y_START - i as f32 * MENU_Y_SPACING;
+        commands.spawn((
+            Text2d::new(*label),
+            TextFont {
+                font_size: 24.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Transform::from_translation(Vec3::new(MENU_TEXT_X, y, 0.0)),
+            MenuEntity,
+        ));
+    }
+
+    // --- Tank cursor (to the left of text) ---
+    let cursor_texture = asset_server.load("sprites/tanks/player1/level1/right_f0.png");
     commands.spawn((
         Sprite {
-            image: texture,
-            custom_size: Some(Vec2::new(32.0, 32.0)),
+            image: cursor_texture,
+            custom_size: Some(Vec2::new(28.0, 28.0)),
             ..default()
         },
-        Transform::from_translation(Vec3::new(-120.0, OPTION_Y[0], 0.0)),
+        Transform::from_translation(Vec3::new(CURSOR_X, MENU_Y_START, 0.0)),
         CursorTank,
         MenuEntity,
     ));
+
+    // --- Credits at bottom ---
+    commands.spawn((
+        Text2d::new("© 2026 D&D GAMES LTD."),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Transform::from_translation(Vec3::new(0.0, -200.0, 0.0)),
+        MenuEntity,
+    ));
+
+    commands.spawn((
+        Text2d::new("ALL RIGHTS RESERVED"),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        Transform::from_translation(Vec3::new(0.0, -230.0, 0.0)),
+        MenuEntity,
+    ));
 }
 
-fn handle_mode_select_input(
+fn word_width_cells(word: &str) -> usize {
+    let letter_count = word.chars().count();
+    if letter_count == 0 {
+        return 0;
+    }
+    letter_count * LETTER_WIDTH + (letter_count - 1) * LETTER_GAP
+}
+
+fn spawn_brick_word(
+    commands: &mut Commands,
+    texture: &Handle<Image>,
+    word: &str,
+    y_top: f32,
+) {
+    let total_cells = word_width_cells(word);
+    let start_x = -(total_cells as f32 * CELL_SIZE) / 2.0;
+
+    let mut cursor_x = 0usize;
+    for ch in word.chars() {
+        if let Some(bitmap) = get_letter_bitmap(ch) {
+            for row in 0..LETTER_HEIGHT {
+                for col in 0..LETTER_WIDTH {
+                    let bit = (bitmap[row] >> (LETTER_WIDTH - 1 - col)) & 1;
+                    if bit == 1 {
+                        let x = start_x + (cursor_x + col) as f32 * CELL_SIZE;
+                        let y = y_top - row as f32 * CELL_SIZE;
+                        commands.spawn((
+                            Sprite {
+                                image: texture.clone(),
+                                custom_size: Some(Vec2::new(CELL_SIZE, CELL_SIZE)),
+                                ..default()
+                            },
+                            Transform::from_translation(Vec3::new(x, y, 0.0)),
+                            MenuEntity,
+                        ));
+                    }
+                }
+            }
+            cursor_x += LETTER_WIDTH + LETTER_GAP;
+        }
+    }
+}
+
+// --- Input & Cursor ---
+
+fn handle_title_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut selected: ResMut<SelectedOption>,
     mut game_state: ResMut<NextState<GameState>>,
     mut menu_state: ResMut<NextState<MenuScreen>>,
 ) {
-    if keyboard.just_pressed(KeyCode::ArrowUp) {
-        selected.0 = 0;
+    if keyboard.just_pressed(KeyCode::ArrowUp) && selected.0 > 0 {
+        selected.0 -= 1;
     }
-    if keyboard.just_pressed(KeyCode::ArrowDown) {
-        selected.0 = 1;
+    if keyboard.just_pressed(KeyCode::ArrowDown) && selected.0 < OPTION_COUNT - 1 {
+        selected.0 += 1;
     }
     if keyboard.just_pressed(KeyCode::Enter) {
         match selected.0 {
@@ -222,6 +273,6 @@ fn handle_mode_select_input(
 
 fn update_cursor(selected: Res<SelectedOption>, mut query: Query<&mut Transform, With<CursorTank>>) {
     for mut transform in &mut query {
-        transform.translation.y = OPTION_Y[selected.0];
+        transform.translation.y = MENU_Y_START - selected.0 as f32 * MENU_Y_SPACING;
     }
 }
