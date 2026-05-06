@@ -3,6 +3,7 @@ use bevy_ggrs::prelude::*;
 
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
 use crate::net::input::{BattleCityConfig, INPUT_FIRE};
+use crate::scenes::level::systems::LevelEntity;
 use crate::scenes::tank::components::*;
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
 use crate::core::states::{GameState, WinnerInfo};
@@ -38,6 +39,7 @@ fn spawn_bullet(commands: &mut Commands, asset_server: &AssetServer, pos: Vec3, 
         },
         Transform::from_translation(bullet_pos),
         Bullet { direction, owner },
+        LevelEntity,
     ));
 }
 

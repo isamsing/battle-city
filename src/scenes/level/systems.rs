@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
 
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
+use crate::core::states::GameState;
 use crate::net::GameMode;
 
 use crate::audio_resume::UserInteractionState;
@@ -11,6 +12,9 @@ use crate::scenes::bullet::components::FireCooldown;
 use crate::scenes::map::systems::{tile_position, load_level, spawn_tiles};
 use crate::scenes::player::components::{LocalPlayer, NetworkPlayer};
 use crate::scenes::tank::components::*;
+
+#[derive(Component)]
+pub struct LevelEntity;
 
 #[derive(Resource)]
 pub struct BackgroundMusicPending;
@@ -32,6 +36,7 @@ pub fn setup_level(
             },
             ..OrthographicProjection::default_2d()
         }),
+        LevelEntity,
     ));
 
     commands.insert_resource(ClearColor(Color::srgb(0.75, 0.75, 0.75)));
@@ -44,6 +49,7 @@ pub fn setup_level(
             ..default()
         },
         Transform::from_translation(Vec3::new(0.0, 0.0, -1.0)),
+        LevelEntity,
     ));
 
     let is_online = matches!(*game_mode, GameMode::OnlineHost(_) | GameMode::OnlineJoin(_));
@@ -120,6 +126,7 @@ fn spawn_local_player(
         TankState::Spawning,
         spawn_anim,
         FireCooldown::new(),
+        LevelEntity,
     ));
 }
 
@@ -153,6 +160,7 @@ fn spawn_network_player(
         TankState::Spawning,
         spawn_anim,
         FireCooldown::new(),
+        LevelEntity,
     ));
 }
 
@@ -165,7 +173,7 @@ pub fn spawn_background_music(
     if pending.is_none() || !interaction.interacted {
         return;
     }
-    commands.spawn(AudioPlayer::new(asset_server.load("levels/background.mp3")))
+    commands.spawn((AudioPlayer::new(asset_server.load("levels/background.mp3")), LevelEntity))
         .insert(PlaybackSettings::LOOP);
     commands.remove_resource::<BackgroundMusicPending>();
 }
@@ -239,5 +247,21 @@ pub fn show_game_over(mut commands: Commands, winner: Option<Res<WinnerInfo>>) {
             width: Val::Percent(100.0),
             ..default()
         },
+        LevelEntity,
     ));
+}
+
+pub fn cleanup_level(mut commands: Commands, query: Query<Entity, With<LevelEntity>>) {
+    for entity in &query {
+        commands.entity(entity).despawn();
+    }
+}
+
+pub fn handle_escape_to_menu(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut game_state: ResMut<NextState<GameState>>,
+) {
+    if keyboard.just_pressed(KeyCode::Escape) {
+        game_state.set(GameState::Menu);
+    }
 }

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::core::config::{TILE_SIZE, MAP_WIDTH, MAP_HEIGHT};
+use crate::scenes::level::systems::LevelEntity;
 use super::components::*;
 
 // --- Map helpers ---
@@ -58,6 +59,7 @@ pub fn spawn_tiles(
                     ..default()
                 },
                 Transform::from_translation(pos),
+                LevelEntity,
             ));
             if is_solid {
                 entity.insert(Solid);

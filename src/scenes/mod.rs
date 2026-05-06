@@ -1,6 +1,6 @@
 mod start_menu;
 mod lobby;
-mod level;
+pub(crate) mod level;
 pub mod bullet;
 pub mod map;
 pub mod player;
