@@ -49,12 +49,10 @@ pub fn start_matchbox_socket(mut commands: Commands, mode: Res<GameMode>, server
             urls: vec![
                 "stun:stun.l.google.com:19302".to_string(),
                 "stun:stun1.l.google.com:19302".to_string(),
-                "turn:openrelay.metered.ca:80".to_string(),
-                "turn:openrelay.metered.ca:443".to_string(),
-                "turn:openrelay.metered.ca:443?transport=tcp".to_string(),
+                "turn:battle-city.fly.dev:3478?transport=tcp".to_string(),
             ],
-            username: Some("openrelayproject".to_string()),
-            credential: Some("openrelayproject".to_string()),
+            username: Some("battlecity".to_string()),
+            credential: Some("tankbattle2026".to_string()),
         })
         .add_channel(ChannelConfig::unreliable())
         .build();
