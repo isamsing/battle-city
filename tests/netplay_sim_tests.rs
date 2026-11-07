@@ -77,6 +77,8 @@ struct Peer {
     rollbacks: u32,
     /// Test hook: corrupt this peer's state once, to prove desync detection works.
     corrupt_at: Option<i32>,
+    /// Drive this peer with the bot instead of the random script.
+    bot: bool,
 }
 
 fn script(handle: usize, frame: i32) -> u8 {
@@ -120,7 +122,7 @@ fn make_peers(n: usize, latency_ticks: u64, jitter: u64, loss: u64, seed: u64) -
                 b = b.add_player(t, h).unwrap();
             }
             let session = b.start_p2p_session(MemSocket { me, net: net.clone() }).unwrap();
-            Peer { session, sim: Sim::new(n, 4242), handle: me, saved: HashMap::new(), desyncs: vec![], disconnected: vec![], rollbacks: 0, corrupt_at: None }
+            Peer { session, sim: Sim::new(n, seed), handle: me, saved: HashMap::new(), desyncs: vec![], disconnected: vec![], rollbacks: 0, corrupt_at: None, bot: false }
         })
         .collect();
     (peers, net)
@@ -139,7 +141,8 @@ fn tick_peer(p: &mut Peer) {
         return;
     }
     let frame = p.session.current_frame();
-    p.session.add_local_input(p.handle, script(p.handle, frame)).unwrap();
+    let bits = if p.bot { bot_bits(&p.sim, p.handle) } else { script(p.handle, frame) };
+    p.session.add_local_input(p.handle, bits).unwrap();
     let requests = match p.session.advance_frame() {
         Ok(r) => r,
         Err(GgrsError::PredictionThreshold) => return,
@@ -171,7 +174,8 @@ fn tick_peer(p: &mut Peer) {
 }
 
 fn run(peers: &mut [Peer], net: &Arc<Mutex<Net>>, ticks: u64, drop_peer_at: Option<(u64, usize)>) {
-    for t in 0..ticks {
+    let start = net.lock().unwrap().tick;
+    for t in start..start + ticks {
         net.lock().unwrap().tick = t;
         if let Some((at, who)) = drop_peer_at {
             if t == at {
@@ -253,4 +257,61 @@ fn four_peers_survive_a_dropped_player() {
 #[ignore]
 fn soak_four_peers_ten_minutes() {
     quick(4, 36_000, 6, 2, 3);
+}
+
+
+/// Same bot as the sim tests: chase the nearest enemy, shoot when lined up.
+fn bot_bits(sim: &Sim, slot: usize) -> u8 {
+    let p = &sim.players[slot];
+    if p.status != PlayerStatus::Active {
+        return 0;
+    }
+    let Some(e) = sim.enemies.iter().filter(|e| e.spawn == 0).min_by_key(|e| (e.x - p.x).abs() + (e.y - p.y).abs()) else {
+        return IN_UP;
+    };
+    let (dx, dy) = (e.x - p.x, e.y - p.y);
+    let (col, row) = (dx.abs() < TANK / 2, dy.abs() < TANK / 2);
+    let mut bits = if col {
+        if dy < 0 { IN_UP } else { IN_DOWN }
+    } else if row {
+        if dx < 0 { IN_LEFT } else { IN_RIGHT }
+    } else if dy.abs() > dx.abs() {
+        if dy < 0 { IN_UP } else { IN_DOWN }
+    } else if dx < 0 {
+        IN_LEFT
+    } else {
+        IN_RIGHT
+    };
+    let base_col = p.x + TANK > 5 * TANK && p.x < 8 * TANK;
+    if (col || row) && !(bits & IN_DOWN != 0 && base_col) && sim.frame % 6 >= 3 {
+        bits |= IN_FIRE;
+    }
+    bits
+}
+
+/// Four peers with real rollback over a 100 ms-class network play a stage with
+/// the bot until it is cleared. Tries a few seeds because the bot is not perfect.
+#[test]
+fn four_peers_finish_a_stage_over_rollback() {
+    let mut cleared_any = false;
+    for seed in 1..=6u64 {
+        let (mut peers, net) = make_peers(4, 6, 2, 3, seed);
+        for p in peers.iter_mut() {
+            p.bot = true;
+        }
+        for _ in 0..30_000u64 {
+            run(&mut peers, &net, 1, None);
+            net.lock().unwrap().tick += 1;
+            if peers.iter().all(|p| p.sim.stage_number >= 1 || p.sim.phase == Phase::GameOver) {
+                break;
+            }
+        }
+        assert_consistent(&peers, &HashSet::new());
+        if peers.iter().all(|p| p.sim.stage_number >= 1) {
+            cleared_any = true;
+            assert!(peers.iter().map(|p| p.rollbacks).sum::<u32>() > 20, "no rollbacks happened");
+            break;
+        }
+    }
+    assert!(cleared_any, "no seed cleared a stage over the network");
 }
