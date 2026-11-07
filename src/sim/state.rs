@@ -672,12 +672,11 @@ impl Sim {
                     }
                     ev.push(self.event(SimEventKind::SteelHit, b.x, b.y));
                 }
-                Cell::Eagle => {
-                    if self.eagle_alive {
+                Cell::Eagle
+                    if self.eagle_alive => {
                         self.eagle_alive = false;
                         ev.push(self.event(SimEventKind::EagleDestroyed, b.x, b.y));
                     }
-                }
                 _ => {}
             }
         }

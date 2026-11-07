@@ -374,11 +374,10 @@ fn handle_lobby_input(
         }
         LobbyPhase::EnteringCode => {
             for code in &typed {
-                if let Some(&(_, ch)) = ROOM_CODE_KEYS.iter().find(|(k, _)| k == code) {
-                    if lobby.input_buffer.len() < 4 {
+                if let Some(&(_, ch)) = ROOM_CODE_KEYS.iter().find(|(k, _)| k == code)
+                    && lobby.input_buffer.len() < 4 {
                         lobby.input_buffer.push(ch);
                     }
-                }
             }
             if typed.contains(&KeyCode::Backspace) {
                 lobby.input_buffer.pop();
@@ -390,7 +389,6 @@ fn handle_lobby_input(
                 *game_mode = GameMode::OnlineJoin(code);
                 commands.insert_resource(LobbyNet::new(false));
                 start_matchbox_socket(&mut commands, &game_mode, &server_url);
-                return;
             }
         }
         LobbyPhase::WaitingAsHost => {
@@ -408,11 +406,10 @@ fn handle_lobby_input(
         }
         LobbyPhase::Connecting => {
             // Joiner: R toggles ready.
-            if let Some(net) = net.as_deref_mut() {
-                if keyboard.just_pressed(KeyCode::KeyR) || keyboard.just_pressed(KeyCode::Enter) {
+            if let Some(net) = net.as_deref_mut()
+                && (keyboard.just_pressed(KeyCode::KeyR) || keyboard.just_pressed(KeyCode::Enter)) {
                     net.local_ready = !net.local_ready;
                 }
-            }
         }
     }
 }

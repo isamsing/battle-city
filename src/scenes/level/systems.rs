@@ -198,10 +198,10 @@ pub fn render_dynamic(
         match p.status {
             PlayerStatus::Spawning => put(spawn_frame(s.frame), p.x, p.y, Color::WHITE, 1.0),
             PlayerStatus::Active => {
-                if p.stun > 0 && (s.frame / 4) % 2 == 0 {
+                if p.stun > 0 && (s.frame / 4).is_multiple_of(2) {
                     continue; // stunned tanks blink
                 }
-                let color = if p.shield > 0 && (s.frame / 4) % 2 == 0 { Color::srgb(0.65, 0.9, 1.0) } else { Color::WHITE };
+                let color = if p.shield > 0 && (s.frame / 4).is_multiple_of(2) { Color::srgb(0.65, 0.9, 1.0) } else { Color::WHITE };
                 let path = format!("sprites/tanks/player{}/level{}/{}_f{}.png", i + 1, p.stars + 1, p.dir.as_str(), tread(p.x, p.y));
                 put(path, p.x, p.y, color, 1.0);
             }
@@ -220,17 +220,16 @@ pub fn render_dynamic(
             (EnemyKind::Armor, _) => Color::srgb(1.0, 0.3, 0.3),
             _ => Color::WHITE,
         };
-        if e.flashing && (s.frame / 6) % 2 == 0 {
+        if e.flashing && (s.frame / 6).is_multiple_of(2) {
             color = Color::srgb(1.0, 0.35, 0.35);
         }
         let path = format!("sprites/tanks/enemy/{}/{}_f{}.png", e.kind.sprite_dir(), e.dir.as_str(), tread(e.x, e.y));
         put(path, e.x, e.y, color, 1.0);
     }
-    if let Some(pu) = s.power {
-        if (s.frame / 8) % 2 == 0 {
+    if let Some(pu) = s.power
+        && (s.frame / 8).is_multiple_of(2) {
             put(pu.kind.sprite().to_string(), pu.x, pu.y, Color::WHITE, 1.5);
         }
-    }
     for b in &s.bullets {
         commands.spawn((
             Sprite { image: asset_server.load(format!("sprites/bullets/bullet_{}.png", b.dir.as_str())), ..default() },

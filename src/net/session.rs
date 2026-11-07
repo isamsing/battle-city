@@ -215,11 +215,10 @@ pub fn lobby_net_update(mut lobby: ResMut<LobbyNet>, socket: Option<ResMut<Match
                 lobby.roster = players;
                 lobby.rejected = !lobby.roster.contains(&my_id) && lobby.roster.len() >= max_players as usize;
             }
-            LobbyMsg::Start { seed, players } if !lobby.is_host => {
-                if lobby.started.is_none() {
+            LobbyMsg::Start { seed, players } if !lobby.is_host
+                && lobby.started.is_none() => {
                     lobby.started = Some(StartInfo { seed, players });
                 }
-            }
             _ => {}
         }
     }
@@ -246,7 +245,7 @@ pub fn lobby_net_update(mut lobby: ResMut<LobbyNet>, socket: Option<ResMut<Match
     lobby.start_requested = false;
 
     // Heartbeats.
-    if lobby.tick % HELLO_EVERY == 0 && lobby.started.is_none() {
+    if lobby.tick.is_multiple_of(HELLO_EVERY) && lobby.started.is_none() {
         let hello = encode(&LobbyMsg::Hello { ready: lobby.local_ready });
         let roster_msg = lobby.is_host.then(|| {
             encode(&LobbyMsg::Roster {
