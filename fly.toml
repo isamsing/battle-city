@@ -19,6 +19,26 @@ primary_region = 'yyz'
     port = 80
     handlers = ["http"]
 
+# TURN server - UDP (preferred) and TCP (fallback for networks that block UDP)
+[[services]]
+  internal_port = 3478
+  protocol = "udp"
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 3478
+
+# TURN relay ports (must match min-port / max-port in turnserver.conf)
+[[services]]
+  internal_port = 49152
+  protocol = "udp"
+
+  [[services.ports]]
+    start_port = 49152
+    end_port = 49252
+
 # TURN server - TCP
 [[services]]
   internal_port = 3478

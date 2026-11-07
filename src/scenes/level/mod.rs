@@ -3,18 +3,11 @@ pub(crate) mod systems;
 
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
+use bevy_ggrs::ResourceChecksumPlugin;
 
 use crate::core::states::{GameState, InGamePhase};
-use crate::net::is_networked;
-
-use super::bullet::components::{Bullet, FireCooldown};
-use super::bullet::systems::*;
-use super::enemy::components::{EnemyTank, EnemyAI, Score};
-use super::enemy::systems::*;
-use super::player::systems::*;
-use super::tank::components::{TankAnimation, TankState, SpawnAnimation, ExplosionAnimation};
-use assets::{start_stage_intro, check_assets_ready, cleanup_stage_intro};
-use systems::{setup_gameplay, spawn_background_music, show_game_over, local_spawn_animation, networked_spawn_animation, local_explosion_animation, networked_explosion_animation, cleanup_level, cleanup_network_session, handle_escape_to_menu};
+use assets::{check_assets_ready, cleanup_stage_intro, start_stage_intro};
+use systems::*;
 
 fn reset_clear_color(mut commands: Commands) {
     commands.insert_resource(ClearColor(Color::BLACK));
@@ -24,67 +17,28 @@ pub struct LevelPlugin;
 
 impl Plugin for LevelPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Score>()
+        app
+            // The whole game state is one rollback resource, hashed every frame
+            // so GGRS can detect desyncs between peers.
+            .rollback_resource_with_clone::<SimRes>()
+            .add_plugins(ResourceChecksumPlugin::<SimRes>(|s| s.0.checksum()))
+            .add_observer(log_sync_test_mismatch)
             // Stage intro: preload assets and show "STAGE 1"
             .add_systems(OnEnter(GameState::InGame), start_stage_intro)
-            .add_systems(
-                Update,
-                check_assets_ready.run_if(in_state(InGamePhase::StageIntro)),
-            )
+            .add_systems(Update, check_assets_ready.run_if(in_state(InGamePhase::StageIntro)))
             .add_systems(OnExit(InGamePhase::StageIntro), cleanup_stage_intro)
-            // Gameplay setup when assets are ready
             .add_systems(OnEnter(InGamePhase::Playing), setup_gameplay)
             .add_systems(OnExit(GameState::InGame), (reset_clear_color, cleanup_level, cleanup_network_session))
+            // One deterministic step per GGRS frame, for offline and online alike.
+            .add_systems(GgrsSchedule, advance_sim.run_if(resource_exists::<SimRes>))
+            // Rendering and UI only read the sim.
             .add_systems(
                 Update,
-                spawn_background_music
-                    .run_if(in_state(InGamePhase::Playing)),
-            )
-            // Escape to return to menu (works during both StageIntro and Playing)
-            .add_systems(
-                Update,
-                handle_escape_to_menu
-                    .run_if(in_state(GameState::InGame)),
-            )
-            // Local-only systems (no networking)
-            .add_systems(
-                Update,
-                (local_spawn_animation, local_explosion_animation,
-                 local_enemy_spawn_wave, local_enemy_movement, local_enemy_fire,
-                 local_player_movement, local_animate_tank, local_enemy_animate, local_fire_bullet,
-                 move_bullets_local, bullet_collision)
+                (sync_terrain, render_dynamic, spawn_blasts, animate_blasts, update_hud, toggle_debug, update_debug, spawn_background_music)
                     .chain()
                     .run_if(in_state(InGamePhase::Playing))
-                    .run_if(not(is_networked)),
+                    .run_if(resource_exists::<SimRes>),
             )
-            // Networked deterministic systems (runs in GgrsSchedule)
-            .add_systems(
-                GgrsSchedule,
-                (networked_spawn_animation, networked_explosion_animation,
-                 networked_enemy_spawn_wave, networked_enemy_movement, networked_enemy_fire,
-                 networked_player_movement, networked_fire_bullet,
-                 move_bullets_networked, bullet_collision)
-                    .chain()
-                    .run_if(is_networked),
-            )
-            // Networked visual-only animation (runs in normal Update)
-            .add_systems(
-                Update,
-                (networked_animate_tank, networked_enemy_animate)
-                    .run_if(in_state(InGamePhase::Playing))
-                    .run_if(is_networked),
-            )
-            // Game over screen
-            .add_systems(OnEnter(GameState::GameOver), show_game_over)
-            // Register rollback components
-            .rollback_component_with_clone::<Transform>()
-            .rollback_component_with_clone::<TankAnimation>()
-            .rollback_component_with_clone::<TankState>()
-            .rollback_component_with_clone::<SpawnAnimation>()
-            .rollback_component_with_clone::<ExplosionAnimation>()
-            .rollback_component_with_clone::<Bullet>()
-            .rollback_component_with_clone::<FireCooldown>()
-            .rollback_component_with_clone::<EnemyTank>()
-            .rollback_component_with_clone::<EnemyAI>();
+            .add_systems(Update, handle_escape_to_menu.run_if(in_state(GameState::InGame)));
     }
 }

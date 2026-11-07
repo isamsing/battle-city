@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Gzipped wasm budget in bytes (goal: initial bundle well under ~15 MB).
+  WASM_GZIP_BUDGET: 12000000
+
+jobs:
+  native:
+    name: Native build + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Install system libraries (Bevy)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --all-targets
+      - run: cargo test
+
+  wasm:
+    name: WASM release build + size budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Trunk and wasm-opt
+        run: |
+          cargo install trunk --locked
+          sudo apt-get update && sudo apt-get install -y binaryen
+      - name: Build
+        run: trunk build --release
+      - name: Check bundle size
+        run: |
+          raw=$(stat -c%s dist/*_bg.wasm)
+          gz=$(gzip -9c dist/*_bg.wasm | wc -c)
+          echo "wasm raw=$raw gzip=$gz (budget $WASM_GZIP_BUDGET)"
+          test "$gz" -le "$WASM_GZIP_BUDGET"

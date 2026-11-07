@@ -142,9 +142,9 @@ pub fn start_stage_intro(mut commands: Commands, asset_server: Res<AssetServer>)
         handles.push(asset_server.load::<Image>(path).untyped());
     }
 
-    // Player tanks (player1 & player2, 4 levels, 4 directions, 2 frames)
+    // Player tanks (4 players, 4 levels, 4 directions, 2 frames)
     let directions = ["up", "down", "left", "right"];
-    for player in ["player1", "player2"] {
+    for player in ["player1", "player2", "player3", "player4"] {
         for level in 1..=4 {
             for dir in &directions {
                 for frame in 0..=1 {
@@ -173,6 +173,11 @@ pub fn start_stage_intro(mut commands: Commands, asset_server: Res<AssetServer>)
                 );
             }
         }
+    }
+
+    // Power-ups
+    for name in ["helmet", "timer", "shovel", "star", "grenade", "tank"] {
+        handles.push(asset_server.load::<Image>(format!("sprites/powerups/{name}.png")).untyped());
     }
 
     // Audio
