@@ -309,3 +309,111 @@ fn killing_an_enemy_scores_for_the_shooter_only() {
     assert_eq!(sim.players[0].score, EnemyKind::Armor.score());
     assert_eq!(sim.players[1].score, 0);
 }
+
+// ---- a stage can actually be finished ----
+
+/// Simple scripted player: walk toward the nearest enemy and shoot when lined
+/// up, never firing downwards from the base column.
+fn bot_input(sim: &Sim, slot: usize) -> StepInput {
+    let p = &sim.players[slot];
+    if p.status != PlayerStatus::Active {
+        return StepInput { bits: 0, human: true };
+    }
+    let target = sim
+        .enemies
+        .iter()
+        .filter(|e| e.spawn == 0)
+        .min_by_key(|e| (e.x - p.x).abs() + (e.y - p.y).abs());
+    let Some(e) = target else {
+        return StepInput { bits: IN_UP, human: true };
+    };
+    let (dx, dy) = (e.x - p.x, e.y - p.y);
+    let aligned_col = dx.abs() < TANK / 2;
+    let aligned_row = dy.abs() < TANK / 2;
+    let mut bits = 0;
+    if aligned_col {
+        bits |= if dy < 0 { IN_UP } else { IN_DOWN };
+    } else if aligned_row {
+        bits |= if dx < 0 { IN_LEFT } else { IN_RIGHT };
+    } else if dy.abs() > dx.abs() {
+        bits |= if dy < 0 { IN_UP } else { IN_DOWN };
+    } else {
+        bits |= if dx < 0 { IN_LEFT } else { IN_RIGHT };
+    }
+    let base_col = p.x + TANK > 5 * TANK && p.x < 8 * TANK;
+    let facing_down = bits & IN_DOWN != 0;
+    if (aligned_col || aligned_row) && !(facing_down && base_col) {
+        bits |= IN_FIRE;
+    }
+    // Pulse the fire bit: GGRS inputs are levels, the sim fires on the rising edge.
+    if sim.frame % 6 < 3 {
+        bits &= !IN_FIRE;
+    }
+    StepInput { bits, human: true }
+}
+
+fn play_with_bots(players: usize, seed: u64, max_frames: u32) -> Sim {
+    let mut sim = Sim::new(players, seed);
+    for _ in 0..max_frames {
+        let mut inputs = [StepInput::default(); MAX_PLAYERS];
+        for slot in 0..players {
+            inputs[slot] = bot_input(&sim, slot);
+        }
+        sim.step(&inputs);
+        if sim.phase == Phase::GameOver || sim.stage_number >= 1 {
+            break;
+        }
+    }
+    sim
+}
+
+#[test]
+fn scripted_players_can_finish_a_stage() {
+    let mut cleared = 0;
+    let mut report = Vec::new();
+    for players in 1..=MAX_PLAYERS {
+        for seed in 0..4u64 {
+            let sim = play_with_bots(players, seed, 60 * 60 * 8);
+            let ok = sim.stage_number >= 1;
+            cleared += ok as u32;
+            report.push(format!("{players}P seed{seed}: stage={} phase={:?} frame={} enemies_left={}", sim.stage_number, sim.phase, sim.frame, sim.queue.len() + sim.enemies.len()));
+        }
+    }
+    let lost_base = (1..=MAX_PLAYERS).flat_map(|n| (0..4u64).map(move |sd| (n, sd))).filter(|&(n, sd)| {
+        let s = play_with_bots(n, sd, 60 * 60 * 8);
+        s.phase == Phase::GameOver && !s.eagle_alive
+    }).count();
+    assert!(lost_base <= 16 - cleared as usize, "accounting error");
+    assert!(cleared >= 6 && lost_base <= 10, "bots cleared {cleared}/16, lost the base in {lost_base}:\n{}", report.join("\n"));
+}
+
+#[test]
+fn eagle_ring_absorbs_a_shot_before_the_eagle_dies() {
+    use battle_city::sim::stage;
+    let mut sim = Sim::new(1, 1);
+    sim.queue.clear(); // no enemy spawns interfering with the single shot
+    sim.queue.push(EnemyKind::Basic);
+    sim.spawn_cd = u16::MAX;
+    // An enemy bullet flying straight down the eagle column from the top.
+    sim.cells = stage::build_cells(0);
+    sim.bullets.push(Bullet { x: 12 * CELL + CELL / 2, y: 17 * CELL, dir: Dir::Down, speed: 28, owner: Owner::Enemy(1), power: 0 });
+    let mut ring_before = 0;
+    for &(cx, cy) in stage::EAGLE_RING.iter() {
+        if sim.cells[stage::idx(cx, cy)] == Cell::Brick {
+            ring_before += 1;
+        }
+    }
+    let mut ring_broken_at = None;
+    for f in 0..200 {
+        sim.step(&[StepInput::default(); MAX_PLAYERS]);
+        if ring_broken_at.is_none() && sim.cells[stage::idx(12, 23)] != Cell::Brick {
+            ring_broken_at = Some(f);
+        }
+        if !sim.eagle_alive {
+            break;
+        }
+    }
+    println!("ring bricks={ring_before} broken_at={ring_broken_at:?} eagle_alive={}", sim.eagle_alive);
+    assert!(ring_broken_at.is_some(), "bullet never reached the ring");
+    assert!(sim.eagle_alive, "one enemy bullet must not kill the eagle through the brick ring");
+}

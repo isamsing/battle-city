@@ -629,6 +629,10 @@ impl Sim {
     }
 
     /// Returns true when the bullet is stopped by terrain.
+    ///
+    /// The bullet destroys whatever it reaches *first* along its direction of
+    /// travel, across its width, and stops there. Without this, one shot would
+    /// break a ring brick and kill the eagle behind it in the same frame.
     fn bullet_vs_cells(&mut self, b: &Bullet, ev: &mut Vec<SimEvent>) -> bool {
         // 4px along the travel axis, one full cell across it.
         let (hw, hh) = if b.dir.horizontal() { (BULLET_HALF, CELL / 2) } else { (CELL / 2, BULLET_HALF) };
@@ -636,35 +640,48 @@ impl Sim {
         let cx1 = ((b.x + hw - 1).min(FIELD - 1)) / CELL;
         let cy0 = ((b.y - hh).max(0)) / CELL;
         let cy1 = ((b.y + hh - 1).min(FIELD - 1)) / CELL;
-        let mut hit = false;
+        let mut hits: Vec<(i32, i32)> = Vec::new();
         for cy in cy0..=cy1 {
             for cx in cx0..=cx1 {
-                let i = stage::idx(cx, cy);
-                match self.cells[i] {
-                    Cell::Brick => {
-                        self.cells[i] = Cell::Empty;
-                        ev.push(self.event(SimEventKind::BrickBreak, b.x, b.y));
-                        hit = true;
-                    }
-                    Cell::Steel => {
-                        if b.power >= 3 {
-                            self.cells[i] = Cell::Empty;
-                        }
-                        ev.push(self.event(SimEventKind::SteelHit, b.x, b.y));
-                        hit = true;
-                    }
-                    Cell::Eagle => {
-                        if self.eagle_alive {
-                            self.eagle_alive = false;
-                            ev.push(self.event(SimEventKind::EagleDestroyed, b.x, b.y));
-                        }
-                        hit = true;
-                    }
-                    _ => {}
+                if matches!(self.cells[stage::idx(cx, cy)], Cell::Brick | Cell::Steel | Cell::Eagle) {
+                    hits.push((cx, cy));
                 }
             }
         }
-        hit
+        if hits.is_empty() {
+            return false;
+        }
+        // Distance along the travel axis, nearest first.
+        let depth = |&(cx, cy): &(i32, i32)| match b.dir {
+            Dir::Down => cy,
+            Dir::Up => -cy,
+            Dir::Right => cx,
+            Dir::Left => -cx,
+        };
+        let first = hits.iter().map(depth).min().unwrap();
+        for (cx, cy) in hits.into_iter().filter(|h| depth(h) == first) {
+            let i = stage::idx(cx, cy);
+            match self.cells[i] {
+                Cell::Brick => {
+                    self.cells[i] = Cell::Empty;
+                    ev.push(self.event(SimEventKind::BrickBreak, b.x, b.y));
+                }
+                Cell::Steel => {
+                    if b.power >= 3 {
+                        self.cells[i] = Cell::Empty;
+                    }
+                    ev.push(self.event(SimEventKind::SteelHit, b.x, b.y));
+                }
+                Cell::Eagle => {
+                    if self.eagle_alive {
+                        self.eagle_alive = false;
+                        ev.push(self.event(SimEventKind::EagleDestroyed, b.x, b.y));
+                    }
+                }
+                _ => {}
+            }
+        }
+        true
     }
 
     /// Returns true when the bullet hit a tank.
