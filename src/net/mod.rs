@@ -1,11 +1,13 @@
 pub mod input;
+pub mod protocol;
 pub mod session;
 pub mod socket_bridge;
+pub mod stats;
 
 use bevy::prelude::*;
 use bevy_ggrs::prelude::*;
 
-use crate::core::states::{GameState, MenuScreen};
+use crate::core::states::MenuScreen;
 use input::BattleCityConfig;
 
 pub struct NetPlugin;
@@ -14,35 +16,21 @@ impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GameMode>()
             .init_resource::<session::ServerUrl>()
+            .init_resource::<stats::NetStats>()
             .add_plugins(GgrsPlugin::<BattleCityConfig>::default())
             .insert_resource(RollbackFrameRate(60))
             .add_systems(ReadInputs, input::read_local_inputs)
             .add_systems(
                 Update,
-                session::wait_for_peers
+                (session::lobby_net_update, session::finish_lobby)
+                    .chain()
                     .run_if(in_state(MenuScreen::Lobby))
-                    .run_if(is_networked),
+                    .run_if(resource_exists::<session::LobbyNet>),
             )
             .add_systems(
                 Update,
-                handle_peer_disconnect
-                    .run_if(in_state(GameState::InGame))
-                    .run_if(is_networked),
+                stats::pump_session.run_if(resource_exists::<Session<BattleCityConfig>>),
             );
-    }
-}
-
-fn handle_peer_disconnect(
-    mut session: ResMut<Session<BattleCityConfig>>,
-    mut game_state: ResMut<NextState<GameState>>,
-) {
-    let Session::P2P(s) = &mut *session else { return };
-    for event in s.events() {
-        if matches!(event, GgrsEvent::Disconnected { .. }) {
-            warn!("Peer disconnected, returning to menu");
-            game_state.set(GameState::Menu);
-            return;
-        }
     }
 }
 

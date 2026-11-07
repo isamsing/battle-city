@@ -5,6 +5,7 @@ use battle_city::audio_resume::AudioResumePlugin;
 use battle_city::core::GameCorePlugin;
 use battle_city::net::NetPlugin;
 use battle_city::scenes::ScenesPlugin;
+use battle_city::web_debug::WebDebugPlugin;
 
 fn main() {
     App::new()
@@ -27,5 +28,6 @@ fn main() {
         .add_plugins(GameCorePlugin)
         .add_plugins(NetPlugin)
         .add_plugins(ScenesPlugin)
+        .add_plugins(WebDebugPlugin)
         .run();
 }

@@ -1,7 +1,10 @@
+use bevy::input::keyboard::KeyboardInput;
+use bevy::input::ButtonState;
 use bevy::prelude::*;
 
+use crate::core::config::{PLAYER_NAMES, PLAYER_RGB};
 use crate::core::states::MenuScreen;
-use crate::net::session::{generate_room_code, start_matchbox_socket, MatchboxRes, ServerUrl};
+use crate::net::session::{generate_room_code, start_matchbox_socket, LobbyNet, MatchboxRes, ServerUrl};
 use crate::net::GameMode;
 
 pub struct LobbyPlugin;
@@ -23,6 +26,13 @@ struct LobbyEntity;
 
 #[derive(Component)]
 struct StatusText;
+
+#[derive(Component)]
+struct InstructionText;
+
+/// One line of the player list (slot 0..=3).
+#[derive(Component)]
+struct RosterLine(usize);
 
 #[derive(Resource)]
 struct LobbyState {
@@ -202,6 +212,7 @@ fn setup_lobby(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Instructions text
     commands.spawn((
         Text2d::new("H - HOST GAME\nJ - JOIN GAME\nS - SET SERVER\nESC - BACK"),
+        InstructionText,
         TextFont {
             font_size: 28.0,
             ..default()
@@ -223,6 +234,19 @@ fn setup_lobby(mut commands: Commands, asset_server: Res<AssetServer>) {
         StatusText,
         LobbyEntity,
     ));
+
+    // Player list: one line per slot, coloured like the tank.
+    for slot in 0..4 {
+        let [r, g, b] = PLAYER_RGB[slot];
+        commands.spawn((
+            Text2d::new(""),
+            TextFont { font_size: 22.0, ..default() },
+            TextColor(Color::srgb_u8(r, g, b)),
+            Transform::from_translation(Vec3::new(0.0, -110.0 - slot as f32 * 30.0, 0.0)),
+            RosterLine(slot),
+            LobbyEntity,
+        ));
+    }
 }
 
 const URL_KEYS: &[(KeyCode, char, char)] = &[
@@ -257,10 +281,20 @@ fn handle_lobby_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut lobby: ResMut<LobbyState>,
+    mut net: Option<ResMut<LobbyNet>>,
+    mut key_events: MessageReader<KeyboardInput>,
     mut game_mode: ResMut<GameMode>,
     mut menu_state: ResMut<NextState<MenuScreen>>,
     mut server_url: ResMut<ServerUrl>,
 ) {
+    // Key presses in the order they happened. Polling `just_pressed` over a key
+    // table would reorder two keys that land in the same (slow) frame.
+    let typed: Vec<KeyCode> = key_events
+        .read()
+        .filter(|e| e.state == ButtonState::Pressed)
+        .map(|e| e.key_code)
+        .collect();
+
     // ESC: go back (or cancel current input phase)
     if keyboard.just_pressed(KeyCode::Escape) {
         match lobby.phase {
@@ -284,7 +318,8 @@ fn handle_lobby_input(
                 lobby.room_code = code.clone();
                 lobby.phase = LobbyPhase::WaitingAsHost;
                 *game_mode = GameMode::OnlineHost(code);
-                start_matchbox_socket(commands, game_mode.into(), server_url.into());
+                commands.insert_resource(LobbyNet::new(true));
+                start_matchbox_socket(&mut commands, &game_mode, &server_url);
                 return;
             }
             if keyboard.just_pressed(KeyCode::KeyJ) {
@@ -298,40 +333,38 @@ fn handle_lobby_input(
         }
         LobbyPhase::EnteringUrl => {
             let shift = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
-            for &(code, lower, upper) in URL_KEYS {
-                if keyboard.just_pressed(code) {
+            for code in &typed {
+                if let Some(&(_, lower, upper)) = URL_KEYS.iter().find(|(k, _, _)| k == code) {
                     lobby.input_buffer.push(if shift { upper } else { lower });
+                    continue;
                 }
-            }
-            // Digits
-            for digit in 0..10u8 {
-                let code = match digit {
-                    0 => KeyCode::Digit0, 1 => KeyCode::Digit1, 2 => KeyCode::Digit2,
-                    3 => KeyCode::Digit3, 4 => KeyCode::Digit4, 5 => KeyCode::Digit5,
-                    6 => KeyCode::Digit6, 7 => KeyCode::Digit7, 8 => KeyCode::Digit8,
-                    _ => KeyCode::Digit9,
+                let digit = match code {
+                    KeyCode::Digit0 => Some('0'),
+                    KeyCode::Digit1 => Some('1'),
+                    KeyCode::Digit2 => Some('2'),
+                    KeyCode::Digit3 => Some('3'),
+                    KeyCode::Digit4 => Some('4'),
+                    KeyCode::Digit5 => Some('5'),
+                    KeyCode::Digit6 => Some('6'),
+                    KeyCode::Digit7 => Some('7'),
+                    KeyCode::Digit8 => Some('8'),
+                    KeyCode::Digit9 => Some('9'),
+                    _ => None,
                 };
-                if keyboard.just_pressed(code) {
-                    lobby.input_buffer.push((b'0' + digit) as char);
+                if let Some(d) = digit {
+                    lobby.input_buffer.push(d);
+                    continue;
                 }
-            }
-            // Special characters for URLs
-            if keyboard.just_pressed(KeyCode::Period) {
-                lobby.input_buffer.push('.');
-            }
-            if keyboard.just_pressed(KeyCode::Slash) {
-                lobby.input_buffer.push('/');
-            }
-            if keyboard.just_pressed(KeyCode::Minus) {
-                lobby.input_buffer.push(if shift { '_' } else { '-' });
-            }
-            if keyboard.just_pressed(KeyCode::Semicolon) {
-                if shift {
-                    lobby.input_buffer.push(':');
+                match code {
+                    KeyCode::Period => lobby.input_buffer.push('.'),
+                    KeyCode::Slash => lobby.input_buffer.push('/'),
+                    KeyCode::Minus => lobby.input_buffer.push(if shift { '_' } else { '-' }),
+                    KeyCode::Semicolon if shift => lobby.input_buffer.push(':'),
+                    KeyCode::Backspace => {
+                        lobby.input_buffer.pop();
+                    }
+                    _ => {}
                 }
-            }
-            if keyboard.just_pressed(KeyCode::Backspace) {
-                lobby.input_buffer.pop();
             }
             if keyboard.just_pressed(KeyCode::Enter) && !lobby.input_buffer.is_empty() {
                 server_url.0 = lobby.input_buffer.clone();
@@ -340,12 +373,14 @@ fn handle_lobby_input(
             }
         }
         LobbyPhase::EnteringCode => {
-            for &(code, ch) in ROOM_CODE_KEYS {
-                if keyboard.just_pressed(code) && lobby.input_buffer.len() < 4 {
-                    lobby.input_buffer.push(ch);
+            for code in &typed {
+                if let Some(&(_, ch)) = ROOM_CODE_KEYS.iter().find(|(k, _)| k == code) {
+                    if lobby.input_buffer.len() < 4 {
+                        lobby.input_buffer.push(ch);
+                    }
                 }
             }
-            if keyboard.just_pressed(KeyCode::Backspace) {
+            if typed.contains(&KeyCode::Backspace) {
                 lobby.input_buffer.pop();
             }
             if keyboard.just_pressed(KeyCode::Enter) && lobby.input_buffer.len() == 4 {
@@ -353,12 +388,31 @@ fn handle_lobby_input(
                 lobby.room_code = code.clone();
                 lobby.phase = LobbyPhase::Connecting;
                 *game_mode = GameMode::OnlineJoin(code);
-                start_matchbox_socket(commands, game_mode.into(), server_url.into());
+                commands.insert_resource(LobbyNet::new(false));
+                start_matchbox_socket(&mut commands, &game_mode, &server_url);
                 return;
             }
         }
-        LobbyPhase::WaitingAsHost | LobbyPhase::Connecting => {
-            // Waiting for peer — handled by NetPlugin's wait_for_peers system
+        LobbyPhase::WaitingAsHost => {
+            // Host controls: 1-4 change the player count, Enter starts the match.
+            if let Some(net) = net.as_deref_mut() {
+                for (key, n) in [(KeyCode::Digit1, 1u8), (KeyCode::Digit2, 2), (KeyCode::Digit3, 3), (KeyCode::Digit4, 4)] {
+                    if keyboard.just_pressed(key) {
+                        net.set_max_players(n);
+                    }
+                }
+                if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::KeyG) {
+                    net.start_requested = true;
+                }
+            }
+        }
+        LobbyPhase::Connecting => {
+            // Joiner: R toggles ready.
+            if let Some(net) = net.as_deref_mut() {
+                if keyboard.just_pressed(KeyCode::KeyR) || keyboard.just_pressed(KeyCode::Enter) {
+                    net.local_ready = !net.local_ready;
+                }
+            }
         }
     }
 }
@@ -366,26 +420,66 @@ fn handle_lobby_input(
 fn update_lobby_ui(
     lobby: Res<LobbyState>,
     server_url: Res<ServerUrl>,
-    mut query: Query<&mut Text2d, With<StatusText>>,
+    net: Option<Res<LobbyNet>>,
+    mut status: Query<&mut Text2d, (With<StatusText>, Without<RosterLine>, Without<InstructionText>)>,
+    mut roster: Query<(&RosterLine, &mut Text2d), (Without<StatusText>, Without<InstructionText>)>,
+    mut help: Query<&mut Text2d, (With<InstructionText>, Without<StatusText>, Without<RosterLine>)>,
 ) {
-    for mut text in &mut query {
-        let status = match &lobby.phase {
-            LobbyPhase::Choosing => {
-                format!("SERVER: {}", server_url.0)
+    let online = matches!(lobby.phase, LobbyPhase::WaitingAsHost | LobbyPhase::Connecting);
+    for mut text in &mut help {
+        **text = match (&lobby.phase, net.as_deref()) {
+            (LobbyPhase::WaitingAsHost, _) => "1-4 - PLAYER COUNT\nENTER - START (ALL READY)\nESC - LEAVE".to_string(),
+            (LobbyPhase::Connecting, _) => "R - READY / NOT READY\nESC - LEAVE".to_string(),
+            _ => "H - HOST GAME\nJ - JOIN GAME\nS - SET SERVER\nESC - BACK".to_string(),
+        };
+    }
+    for mut text in &mut status {
+        let s = match (&lobby.phase, net.as_deref()) {
+            (LobbyPhase::Choosing, _) => format!("SERVER: {}", server_url.0),
+            (LobbyPhase::WaitingAsHost, Some(n)) => {
+                let hint = if n.can_start() {
+                    "PRESS ENTER TO START".to_string()
+                } else if n.roster.len() < n.max_players as usize {
+                    format!("WAITING FOR {} MORE...", n.max_players as usize - n.roster.len())
+                } else {
+                    "WAITING FOR READY...".to_string()
+                };
+                format!("ROOM CODE: {}   PLAYERS: {}\n{}", lobby.room_code, n.max_players, hint)
             }
-            LobbyPhase::WaitingAsHost => {
-                format!("ROOM CODE: {}\nWAITING FOR OPPONENT...", lobby.room_code)
-            }
-            LobbyPhase::EnteringCode => {
+            (LobbyPhase::WaitingAsHost, None) => format!("ROOM CODE: {}", lobby.room_code),
+            (LobbyPhase::EnteringCode, _) => {
                 let remaining = 4 - lobby.input_buffer.len();
                 format!("ENTER CODE: {}{}", lobby.input_buffer, "_".repeat(remaining))
             }
-            LobbyPhase::EnteringUrl => {
+            (LobbyPhase::EnteringUrl, _) => {
                 format!("SERVER URL: {}_\n\nENTER TO CONFIRM | ESC TO CANCEL", lobby.input_buffer)
             }
-            LobbyPhase::Connecting => "CONNECTING...".to_string(),
+            (LobbyPhase::Connecting, Some(n)) if n.rejected => "ROOM IS FULL".to_string(),
+            (LobbyPhase::Connecting, Some(n)) if n.my_id.is_none() || n.roster.is_empty() => {
+                format!("CONNECTING TO {}...", lobby.room_code)
+            }
+            (LobbyPhase::Connecting, Some(n)) => {
+                let me = if n.local_ready { "READY - WAITING FOR HOST" } else { "PRESS R WHEN READY" };
+                format!("ROOM {}   {}", lobby.room_code, me)
+            }
+            (LobbyPhase::Connecting, None) => "CONNECTING...".to_string(),
         };
-        **text = status;
+        **text = s;
+    }
+    for (line, mut text) in &mut roster {
+        let slot = line.0;
+        **text = match net.as_deref() {
+            Some(n) if online && slot < n.max_players as usize => match n.roster.get(slot) {
+                Some(peer) => {
+                    let you = if Some(*peer) == n.my_id { " (YOU)" } else { "" };
+                    let host = if slot == 0 { " HOST" } else { "" };
+                    let ready = if n.is_ready(peer) { "READY" } else { "NOT READY" };
+                    format!("P{} {}{}{}  {}", slot + 1, PLAYER_NAMES[slot], host, you, ready)
+                }
+                None => format!("P{} {}  - EMPTY -", slot + 1, PLAYER_NAMES[slot]),
+            },
+            _ => String::new(),
+        };
     }
 }
 
@@ -394,6 +488,8 @@ fn cleanup_lobby(mut commands: Commands, query: Query<Entity, With<LobbyEntity>>
         commands.entity(entity).despawn();
     }
     commands.remove_resource::<LobbyState>();
-    // Clean up any active WebRTC socket if leaving lobby before peer connected
+    commands.remove_resource::<LobbyNet>();
+    // Drop any WebRTC socket still in the lobby. When a match starts, the
+    // socket has already been moved into `PendingMatch` and is kept.
     commands.remove_resource::<MatchboxRes>();
 }
