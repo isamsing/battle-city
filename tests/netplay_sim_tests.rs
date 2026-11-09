@@ -240,11 +240,23 @@ fn four_peers_stay_in_sync_at_100ms_with_jitter_and_loss() {
 #[test]
 fn four_peers_survive_a_dropped_player() {
     let (mut peers, net) = make_peers(4, 4, 1, 1, 77);
-    run(&mut peers, &net, 5000, Some((1500, 3)));
+    run(&mut peers, &net, 1500, Some((1499, 3)));
+    // GGRS's disconnect timeout runs on wall-clock time, not ticks, so keep
+    // ticking until every survivor has noticed (bounded), however fast the
+    // machine is. A tick count alone made this flaky on fast CI runners.
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let survivors_saw_drop = |peers: &[Peer]| peers.iter().filter(|p| p.handle != 3).all(|p| p.disconnected.contains(&3));
+    while !survivors_saw_drop(&peers) {
+        assert!(std::time::Instant::now() < deadline, "survivors never saw player 3 disconnect");
+        run(&mut peers, &net, 50, None);
+    }
+    let at_drop: Vec<i32> = peers.iter().map(|p| p.session.current_frame()).collect();
+    // After the drop is detected, the match must keep running without player 3.
+    run(&mut peers, &net, 1500, None);
     let dropped: HashSet<usize> = [3].into_iter().collect();
     for p in peers.iter().filter(|p| p.handle != 3) {
-        assert!(p.disconnected.contains(&3), "peer {} never saw player 3 disconnect", p.handle);
-        assert!(p.session.current_frame() > 1500 + 300, "peer {} froze after the drop", p.handle);
+        let gained = p.session.current_frame() - at_drop[p.handle];
+        assert!(gained > 600, "peer {} froze after the drop (only {gained} frames)", p.handle);
     }
     assert_consistent(&peers, &dropped);
     // The dropped player's tank must now be AI-controlled on the survivors.
